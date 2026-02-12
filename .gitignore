@@ -1,0 +1,10 @@
+# Maven build folder
+/target/
+
+# IDE files
+*.iml
+.idea/
+*.class
+
+# Logs
+*.log
