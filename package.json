@@ -1,11 +1,8 @@
 {
   "name": "discord-multipurpose-bot",
   "version": "1.0.0",
-  "description": "VoiceMaster + Weekly Leaderboards bot",
   "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
+  "license": "MIT",
   "dependencies": {
     "discord.js": "^14.14.0",
     "express": "^4.18.2"
