@@ -65,16 +65,17 @@ const voiceMaster = (client) => {
         .setColor("#000001")
         .setTitle("VC Commands")
         .setDescription(`
-.vc lock — Lock your VC
-.vc unlock — Unlock your VC
-.vc hide — Hide your VC
-.vc unhide — Unhide your VC
-.vc kick @user — Kick a user
-.vc ban @user — Ban a user
-.vc permit @user — Permit a user
-.vc rename <name> — Rename your VC
-.vc transfer @user — Transfer VC ownership
-.vc info — Show VC info
+**.vc lock** — `Lock your VC`
+**.vc unlock** — `Unlock your VC`
+**.vc hide** — `Hide your VC`
+**.vc unhide** — `Unhide your VC`
+**.vc kick @user** — `Kick a user`
+**.vc ban** — `Ban a user`
+**.vc permit** — `Permit a user`
+**.vc limit**  — `Set VC user limit`
+**.vc rename**  — `Rename your VC`
+**.vc transfer @user** — ` Transfer VC ownership`
+**.vc info** — `Show VC info`
         `);
       return message.channel.send({ embeds:[embed] });
     }
@@ -95,6 +96,11 @@ const voiceMaster = (client) => {
       case "rename": const newName=args.slice(1).join(" "); if(!newName) return message.channel.send(successEmbed("Provide a new name.")); await channel.setName(newName); return message.channel.send(successEmbed(`Renamed to ${newName}`));
       case "transfer": if(!target) return message.channel.send(successEmbed("Mention a user.")); vcData.vcOwners[channel.id]=target.id; saveData(); return message.channel.send(successEmbed(`${target.user.tag} is now the VC owner.`));
       case "info": return message.channel.send(successEmbed(`Name: ${channel.name}\nMembers: ${channel.members.size}\nLimit: ${channel.userLimit||"None"}`));
+      case "limit":
+        const num = parseInt(args[1]);
+        if(!num || num < 0 || num > 99) return message.channel.send(successEmbed("Provide a number between 0-99."));
+        await channel.setUserLimit(num);
+        return message.channel.send(successEmbed(`VC user limit set to ${num}.`));
       default: return message.channel.send(successEmbed("Unknown subcommand."));
     }
   });
