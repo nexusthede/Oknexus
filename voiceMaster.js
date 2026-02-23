@@ -65,17 +65,17 @@ const voiceMaster = (client) => {
         .setColor("#000001")
         .setTitle("VC Commands")
         .setDescription(`
-**.vc lock** — `Lock your VC`
-**.vc unlock** — `Unlock your VC`
-**.vc hide** — `Hide your VC`
-**.vc unhide** — `Unhide your VC`
-**.vc kick @user** — `Kick a user`
-**.vc ban** — `Ban a user`
-**.vc permit** — `Permit a user`
-**.vc limit**  — `Set VC user limit`
-**.vc rename**  — `Rename your VC`
-**.vc transfer @user** — ` Transfer VC ownership`
-**.vc info** — `Show VC info`
+**.vc lock** — \`Lock your VC\`
+**.vc unlock** — \`Unlock your VC\`
+**.vc hide** — \`Hide your VC\`
+**.vc unhide** — \`Unhide your VC\`
+**.vc kick @user** — \`Kick a user\`
+**.vc ban** — \`Ban a user\`
+**.vc permit** — \`Permit a user\`
+**.vc limit** — \`Set VC user limit\`
+**.vc rename** — \`Rename your VC\`
+**.vc transfer @user** — \`Transfer VC ownership\`
+**.vc info** — \`Show VC info\`
         `);
       return message.channel.send({ embeds:[embed] });
     }
