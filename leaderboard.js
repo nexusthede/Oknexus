@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require("discord.js");
+const { EmbedBuilder, PermissionsBitField } = require("discord.js");
 const config = require("./config");
 
 let chatLB = new Map();
@@ -25,37 +25,30 @@ function getDaysUntilReset() {
 
 // Create leaderboard embed
 function createEmbed(title, map, type, allMembers) {
-  // Include all non-bot members with 0 if missing
   allMembers.forEach(member => {
     if (!member.user.bot && !map.has(member.id)) map.set(member.id, 0);
   });
 
   const sorted = [...map.entries()]
+    .filter(([id]) => allMembers.has(id))
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10);
 
-  const medals = [
-    "<a:gold_crown:1475378812266086410>",
-    "<a:silver_crown:1475378823506690098>",
-    "<a:bronze_crown:1475378837251428403>",
-  ];
-  const diamond = "<a:shiny_diamond:1475401622686273546>";
-  const label = type === "vc" ? "mins" : "msgs";
+  const label = type === "vc" ? "h" : "msgs";
 
   const desc = sorted
     .map((u, i) => {
-      const emoji = i < 3 ? medals[i] : diamond;
       const member = allMembers.get(u[0]);
-      const username = member ? member.user.username : "Unknown";
-      return `\`${i + 1}.\` ${emoji} **${username}** — \`${u[1]} ${label}\``;
+      const username = member ? `<@${u[0]}>` : "Unknown";
+      return `**${i + 1}.** ${username} — \`${u[1]} ${label}\``;
     })
     .join("\n");
 
   return new EmbedBuilder()
     .setColor("#5865F2")
     .setTitle(title)
-    .setDescription(`${desc}\n**Resets in**\n\`${getDaysUntilReset()} Days\``)
-    .setFooter({ text: "Updated • Resets weekly" })
+    .setDescription(desc || "No activity yet")
+    .setFooter({ text: `Resets in ${getDaysUntilReset()} days • Updated every 10 mins` })
     .setTimestamp();
 }
 
@@ -76,31 +69,11 @@ async function updateMessage(channel, msgId, embed) {
   }
 }
 
-// Automatic leaderboard update every 10 minutes
-function autoUpdate(client) {
-  setInterval(async () => {
-    await module.exports.executeChat(client);
-    await module.exports.executeVC(client);
-  }, 10 * 60 * 1000);
-}
-
-// Schedule weekly reset
-function scheduleWeeklyReset() {
-  const now = Date.now();
-  const next = getNextReset();
-  const diff = next - now;
-  setTimeout(() => {
-    chatLB.clear();
-    vcLB.clear();
-    scheduleWeeklyReset();
-  }, diff);
-}
-
 // Track chat messages
 function trackMessage(message) {
   if (!message.guild || message.guild.id !== config.ALLOWED_GUILD) return;
   if (message.author.bot) return;
-  module.exports.addChat(message.author.id);
+  chatLB.set(message.author.id, (chatLB.get(message.author.id) || 0) + 1);
 }
 
 // Track VC minutes
@@ -108,11 +81,86 @@ function trackVoice(memberId, minutes = 1) {
   vcLB.set(memberId, (vcLB.get(memberId) || 0) + minutes);
 }
 
+// Auto update leaderboard every 10 minutes
+function autoUpdate(client) {
+  setInterval(async () => {
+    await module.exports.updateChat(client);
+    await module.exports.updateVC(client);
+  }, 10 * 60 * 1000);
+}
+
+// Schedule weekly reset
+function scheduleWeeklyReset() {
+  const now = Date.now();
+  const diff = getNextReset() - now;
+  setTimeout(() => {
+    chatLB.clear();
+    vcLB.clear();
+    scheduleWeeklyReset();
+  }, diff);
+}
+
+// Admin commands
+async function handleCommand(message) {
+  if (!message.guild) return;
+  if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
+
+  const args = message.content.slice(config.PREFIX.length).trim().split(/ +/);
+  const cmd = args.shift()?.toLowerCase();
+
+  // Delete command after 5 seconds
+  message.delete().catch(() => {});
+
+  if (cmd === "set") {
+    const sub = args.shift()?.toLowerCase();
+    const channel = message.mentions.channels.first();
+    if (!channel) return;
+
+    let embed;
+    if (sub === "vclb") {
+      config.VC_LB_CHANNEL = channel.id;
+      embed = new EmbedBuilder()
+        .setColor("#5865F2")
+        .setDescription(`VC Leaderboard channel set to <#${channel.id}>`);
+    } else if (sub === "chatlb") {
+      config.CHAT_LB_CHANNEL = channel.id;
+      embed = new EmbedBuilder()
+        .setColor("#5865F2")
+        .setDescription(`Chat Leaderboard channel set to <#${channel.id}>`);
+    } else {
+      embed = new EmbedBuilder()
+        .setColor("#ED4245")
+        .setDescription("Invalid option. Use `vclb` or `chatlb`.");
+    }
+
+    const msg = await message.channel.send({ embeds: [embed] });
+    setTimeout(() => msg.delete().catch(() => {}), 5000);
+  }
+
+  if (cmd === "upload") {
+    const embed = new EmbedBuilder()
+      .setColor("#5865F2")
+      .setDescription("Uploading leaderboard embeds...");
+    const msg = await message.channel.send({ embeds: [embed] });
+    setTimeout(() => msg.delete().catch(() => {}), 5000);
+
+    if (config.CHAT_LB_CHANNEL) {
+      const ch = message.guild.channels.cache.get(config.CHAT_LB_CHANNEL);
+      if (ch) await module.exports.setupChat({ channel: ch, guild: message.guild });
+    }
+    if (config.VC_LB_CHANNEL) {
+      const ch = message.guild.channels.cache.get(config.VC_LB_CHANNEL);
+      if (ch) await module.exports.setupVC({ channel: ch, guild: message.guild });
+    }
+  }
+}
+
 module.exports = {
   addChat: trackMessage,
   addVC: trackVoice,
+  handleCommand,
 
-  async executeChat(client) {
+  async updateChat(client) {
     if (!config.CHAT_LB_CHANNEL) return;
     const guild = client.guilds.cache.get(config.ALLOWED_GUILD);
     if (!guild) return;
@@ -123,7 +171,7 @@ module.exports = {
     chatMsgId = await updateMessage(ch, chatMsgId, embed);
   },
 
-  async executeVC(client) {
+  async updateVC(client) {
     if (!config.VC_LB_CHANNEL) return;
     const guild = client.guilds.cache.get(config.ALLOWED_GUILD);
     if (!guild) return;
@@ -134,19 +182,18 @@ module.exports = {
     vcMsgId = await updateMessage(ch, vcMsgId, embed);
   },
 
-  async setupChat(message) {
-    const embed = createEmbed("Weekly Chat Leaderboard", chatLB, "chat", message.guild.members.cache);
-    const msg = await message.channel.send({ embeds: [embed] });
+  async setupChat({ channel, guild }) {
+    const embed = createEmbed("Weekly Chat Leaderboard", chatLB, "chat", guild.members.cache);
+    const msg = await channel.send({ embeds: [embed] });
     chatMsgId = msg.id;
   },
 
-  async setupVC(message) {
-    const embed = createEmbed("Weekly VC Leaderboard", vcLB, "vc", message.guild.members.cache);
-    const msg = await message.channel.send({ embeds: [embed] });
+  async setupVC({ channel, guild }) {
+    const embed = createEmbed("Weekly VC Leaderboard", vcLB, "vc", guild.members.cache);
+    const msg = await channel.send({ embeds: [embed] });
     vcMsgId = msg.id;
   },
 
-  // Auto update interval + weekly reset starter
   start(client) {
     autoUpdate(client);
     scheduleWeeklyReset();
