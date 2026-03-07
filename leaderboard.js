@@ -20,6 +20,7 @@ function getDaysUntilReset() {
 
 // --- Embed creator ---
 function createEmbed(title, map, type, allMembers) {
+  // ensure all non-bot users are included
   allMembers.forEach(member => {
     if (!member.user.bot && !map.has(member.id)) map.set(member.id, 0);
   });
@@ -35,7 +36,7 @@ function createEmbed(title, map, type, allMembers) {
     .map((u, i) => {
       const member = allMembers.get(u[0]);
       const username = member ? `<@${u[0]}>` : "Unknown";
-      return `**${i + 1}.** ${username} — \`${u[1]} ${label}\``;
+      return `**${i + 1}.** ${username} — \`${u[1].toFixed(1)} ${label}\``;
     })
     .join("\n");
 
@@ -47,7 +48,7 @@ function createEmbed(title, map, type, allMembers) {
     .setTimestamp();
 }
 
-// --- Message updater ---
+// --- Update or send single embed ---
 async function updateMessage(channel, msgId, embed) {
   try {
     if (msgId) {
@@ -99,7 +100,7 @@ async function updateVC(client) {
   vcMsgId = await updateMessage(ch, vcMsgId, embed);
 }
 
-// --- Setup manually ---
+// --- Manual setup ---
 async function setupChat(channel, guild) {
   const embed = createEmbed("Weekly Chat Leaderboard", chatLB, "chat", guild.members.cache);
   const msg = await channel.send({ embeds: [embed] });
@@ -120,6 +121,7 @@ async function handleLeaderboardCommands(message) {
   const args = message.content.slice(config.PREFIX.length).trim().split(/ +/);
   const cmd = args.shift()?.toLowerCase();
 
+  // Delete command after 5s
   message.delete().catch(() => {});
 
   if (cmd === "set") {
@@ -158,7 +160,7 @@ async function handleLeaderboardCommands(message) {
   }
 }
 
-// --- Auto-update interval ---
+// --- Auto-update every 10 mins ---
 function start(client) {
   setInterval(async () => {
     await updateChat(client);
