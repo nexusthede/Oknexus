@@ -120,7 +120,6 @@ async function handleLeaderboardCommands(message) {
   const args = message.content.slice(config.PREFIX.length).trim().split(/ +/);
   const cmd = args.shift()?.toLowerCase();
 
-  // Delete command message after 5 seconds
   message.delete().catch(() => {});
 
   if (cmd === "set") {
@@ -164,7 +163,7 @@ function start(client) {
   setInterval(async () => {
     await updateChat(client);
     await updateVC(client);
-  }, 10 * 60 * 1000); // 10 minutes
+  }, 10 * 60 * 1000);
 }
 
 module.exports = {
