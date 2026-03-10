@@ -2,9 +2,12 @@ module.exports = {
   TOKEN: process.env.BOT_TOKEN,                 // Bot token from Render secrets
   PREFIX: ",",                                  // Command prefix
 
+  // Welcome channel
+  WELCOME_CHANNEL: "1478693017559765063",      // Channel to send welcome messages
+
   // Join-to-create / Join-to-unmute
-  JOIN_TO_CREATE_ID: "1480978441980477440",     // Join-to-create VC channel
-  JOIN_TO_UNMUTE_ID: "1480978490697187478",    // Join-to-unmute VC channel
+  JOIN_TO_CREATE_ID: "1480978441980477440",    // Join-to-create VC channel
+  JOIN_TO_UNMUTE_ID: "1480978490697187478",   // Join-to-unmute VC channel
 
   // VC categories
   VOICEMASTER_CATEGORY: "1480977750218248222", // Voicemaster VCs category
