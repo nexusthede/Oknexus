@@ -3,12 +3,10 @@ const config = require("./config");
 
 const WELCOME_CHANNEL = "1478693017559765063";
 
-// random embed color
 function randomColor() {
   return Math.floor(Math.random() * 16777215);
 }
 
-// format time like "Today at 9:14 AM"
 function getTime() {
   const now = new Date();
   return now.toLocaleTimeString("en-US", {
@@ -26,17 +24,16 @@ async function handleJoin(member) {
 
   const embed = new EmbedBuilder()
     .setColor(randomColor())
+    .setTitle(`Welcome to ${member.guild.name}`) // dynamic server name
     .setAuthor({
       name: member.user.username,
       iconURL: member.user.displayAvatarURL({ dynamic: true }),
     })
     .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
     .setDescription(
-`Welcome to **${member.guild.name}**
-
-・Read our [Rules](https://discord.gg/3ytNyU2qtj)
-・Get some [Roles](https://discord.gg/NGAEsznEss)
-・Invite your friends!`
+`<:00:1481058519909138633>・Read our [Rules](https://discord.gg/3ytNyU2qtj)
+<:00:1481058519909138633>・Get some [Roles](https://discord.gg/NGAEsznEss)
+<:00:1481058519909138633>・Invite your friends!`
     )
     .setFooter({
       text: `Today at ${getTime()}`
@@ -45,12 +42,14 @@ async function handleJoin(member) {
   const chatButton = new ButtonBuilder()
     .setLabel("Chat Here")
     .setStyle(ButtonStyle.Secondary)
-    .setURL("https://discord.gg/s32P9shHHa");
+    .setURL("https://discord.gg/s32P9shHHa")
+    .setEmoji("<:purple_astro:1468428523755802627>");
 
   const vcButton = new ButtonBuilder()
     .setLabel("Create VC")
     .setStyle(ButtonStyle.Secondary)
-    .setURL("https://discord.gg/keGMdwE2KV");
+    .setURL("https://discord.gg/keGMdwE2KV")
+    .setEmoji("<:greenflower:1468428520584777840>");
 
   const row = new ActionRowBuilder().addComponents(chatButton, vcButton);
 
