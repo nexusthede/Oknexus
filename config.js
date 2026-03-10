@@ -6,18 +6,18 @@ module.exports = {
   WELCOME_CHANNEL: "1478693017559765063",      // Channel to send welcome messages
 
   // Join-to-create / Join-to-unmute
-  JOIN_TO_CREATE_ID: "1480978441980477440",    // Join-to-create VC channel
-  JOIN_TO_UNMUTE_ID: "1480978490697187478",   // Join-to-unmute VC channel
+  JOIN_TO_CREATE_ID: "1480978441980477440",    
+  JOIN_TO_UNMUTE_ID: "1480978490697187478",   
 
   // VC categories
-  VOICEMASTER_CATEGORY: "1480977750218248222", // Voicemaster VCs category
-  PUBLIC_VC_CATEGORY: "1480977801015459973",   // Public VCs category
-  PRIVATE_VC_CATEGORY: "1480977835211493416",  // Private VCs category
+  VOICEMASTER_CATEGORY: "1480977750218248222", 
+  PUBLIC_VC_CATEGORY: "1480977801015459973",   
+  PRIVATE_VC_CATEGORY: "1480977835211493416",  
 
   // Leaderboard channels (optional)
-  CHAT_LB_CHANNEL: null,                        // Chat leaderboard channel
-  VC_LB_CHANNEL: null,                          // VC leaderboard channel
+  CHAT_LB_CHANNEL: null,                        
+  VC_LB_CHANNEL: null,                          
 
-  ALLOWED_GUILD: "1449708401050259457",        // Your server ID
-  PORT: 3000                                    // Default port for hosting
+  ALLOWED_GUILD: "1449708401050259457",        
+  PORT: 3000                                    
 };
