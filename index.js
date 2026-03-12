@@ -1,8 +1,10 @@
 const { Client, GatewayIntentBits, Partials } = require("discord.js");
 const express = require("express");
 const config = require("./config");
-const voiceMaster = require("./voiceMaster"); // your VC module
+const VoiceMaster = require("./VoiceMaster"); // your VC module
+const welcome = require("./welcome");         // your existing welcome system
 
+// Create client
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -14,31 +16,28 @@ const client = new Client({
   partials: [Partials.Channel]
 });
 
-// Express for BetterStack ping
+// Express for uptime
 const app = express();
 app.get("/", (req, res) => res.send("Bot online"));
 app.listen(config.PORT, () => console.log(`Bot running on port ${config.PORT}`));
 
-// Welcome system
+// Welcome system (auto)
 client.on("guildMemberAdd", async (member) => {
   if (member.guild.id !== config.ALLOWED_GUILD) return;
-  if (typeof require("./welcome").handleJoin === "function") {
-    await require("./welcome").handleJoin(member);
-  }
+  await welcome.handleJoin(member); // automatically uses your configured WELCOME_CHANNEL
 });
 
 // Command handling
 client.on("messageCreate", async (message) => {
   if (!message.guild || message.author.bot) return;
 
-  // Pass to VoiceMaster commands
   if (message.content.startsWith(config.PREFIX)) {
-    await voiceMaster.execute(client, message);
+    await VoiceMaster.execute(client, message);
   }
 });
 
-// Setup voice listeners for join-to-create, buttons, etc.
-voiceMaster.setupVoiceListeners(client);
+// Setup VoiceMaster listeners (join-to-create, buttons, etc.)
+VoiceMaster.setupVoiceListeners(client);
 
 // Login bot
 client.login(config.TOKEN);
