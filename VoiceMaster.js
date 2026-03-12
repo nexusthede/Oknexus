@@ -18,23 +18,23 @@ module.exports = {
     // ,interface command
     // --------------------------
     if (command === "interface") {
+
       const embed = new EmbedBuilder()
         .setTitle("VoiceMaster Interface")
         .setAuthor({ name: guild.name, iconURL: guild.iconURL({ dynamic: true }) })
-        .setDescription(`
-Use the buttons below to manage your voice channel.
+        .setDescription(`Use the buttons below to manage your **voice channel**.
 
-<:vc_lock:1477309124537483439> - [\`Lock\`] your voice channel  
-<:vc_unlock:1477309329433559203> - [\`Unlock\`] your voice channel  
-<:vc_hide:1477311897262096497> - [\`Hide\`] your voice channel  
-<:vc_unhide:1477311594638606336> - [\`Reveal\`] your voice channel  
-<:vc_rename:1477312271926431987> - [\`Rename\`] your voice channel  
-<:vc_decrease:1477690349366280263> - [\`Decrease\`] the member limit  
-<:vc_increase:1477690326830287080> - [\`Increase\`] the member limit  
-<:vc_info:1477312480463294628> - [\`Info\`] about your voice channel  
-<:vc_kick:1477311772137619478> - [\`Kick\`] someone from your voice channel  
-<:vc_claim:1477559856394403942> - [\`Claim\`] ownership of your voice channel
-        `)
+**Buttons**
+<:vc_lock:1477309124537483439> - [\`Lock\`] your **voice channel**
+<:vc_unlock:1477309329433559203> - [\`Unlock\`] your **voice channel**
+<:vc_hide:1477311897262096497> - [\`Hide\`] your **voice channel**
+<:vc_unhide:1477311594638606336> - [\`Reveal\`] your **voice channel**
+<:vc_rename:1477312271926431987> - [\`Rename\`] your **voice channel**
+<:vc_decrease:1477690349366280263> - [\`Decrease\`] the member limit
+<:vc_increase:1477690326830287080> - [\`Increase\`] the member limit
+<:vc_info:1477312480463294628> - [\`Info\`] about your **voice channel**
+<:vc_kick:1477311772137619478> - [\`Kick\`] someone from your **voice channel**
+<:vc_claim:1477559856394403942> - [\`Claim\`] ownership of your **voice channel**`)
         .setColor(null);
 
       const row1 = new ActionRowBuilder().addComponents(
@@ -63,75 +63,45 @@ Use the buttons below to manage your voice channel.
     // ,vc <action> commands
     // --------------------------
     if (command === "vc") {
+
       const action = args.shift()?.toLowerCase();
+
       if (!channel)
         return message.reply({
-          embeds: [new EmbedBuilder().setDescription("<:xx_no:1481734627193520323> You are not in a voice channel!").setColor(null)]
+          embeds: [new EmbedBuilder().setDescription("<:xx_no:1481734627193520323> You are not in a **voice channel**!").setColor(null)]
         });
 
       const ownerId = vcOwners.get(channel.id);
+
       if (ownerId && ownerId !== member.id)
         return message.reply({
-          embeds: [new EmbedBuilder().setDescription("<:xx_no:1481734627193520323> You do not own this voice channel!").setColor(null)]
+          embeds: [new EmbedBuilder().setDescription("<:xx_no:1481734627193520323> You do not own this **voice channel**!").setColor(null)]
         });
 
       try {
+
         const msg = await performVoiceChannelAction(action, member, channel, args);
-        return message.reply({ embeds: [new EmbedBuilder().setDescription(msg).setColor(null)] });
+
+        return message.reply({
+          embeds: [new EmbedBuilder().setDescription(msg).setColor(null)]
+        });
+
       } catch (err) {
+
         console.error(err);
-        return message.reply({ embeds: [new EmbedBuilder().setDescription("<:xx_no:1481734627193520323> Failed to perform this action!").setColor(null)] });
+
+        return message.reply({
+          embeds: [new EmbedBuilder().setDescription("<:xx_no:1481734627193520323> Failed to perform this action!").setColor(null)]
+        });
+
       }
     }
   },
 
   setupVoiceListeners(client) {
-    client.on("voiceStateUpdate", async (oldState, newState) => {
-      const member = newState.member;
-      const guild = newState.guild;
 
-      // ------------- JOIN TO CREATE -------------
-      if (newState.channelId === config.JOIN_TO_CREATE_ID) {
-        try {
-          const vc = await guild.channels.create({
-            name: `${member.displayName}'s channel`,
-            type: ChannelType.GuildVoice,
-            parent: config.PUBLIC_VC_CATEGORY,
-            permissionOverwrites: [
-              { id: guild.roles.everyone.id, allow: ["Connect", "Speak"] },
-            ],
-          });
-
-          vcOwners.set(vc.id, member.id);
-          await member.voice.setChannel(vc);
-
-          const interval = setInterval(async () => {
-            const fetched = await guild.channels.fetch(vc.id).catch(() => null);
-            if (!fetched || fetched.members.size === 0) {
-              clearInterval(interval);
-              if (fetched) await fetched.delete().catch(() => {});
-              vcOwners.delete(vc.id);
-            }
-          }, 5000);
-        } catch (err) {
-          console.error("Join-to-Create Error:", err);
-        }
-      }
-
-      // ------------- JOIN TO UNMUTE -------------
-      if (newState.channelId === config.JOIN_TO_UNMUTE_ID) {
-        try {
-          if (newState.serverMute) await newState.setMute(false, "Join-to-Unmute VoiceMaster");
-        } catch (err) {
-          console.error("Join-to-Unmute Error:", err);
-        }
-      }
-    });
-
-    // --------------------------
-    // Button interactions
-    // --------------------------
     client.on(Events.InteractionCreate, async (interaction) => {
+
       if (!interaction.isButton()) return;
 
       const member = interaction.member;
@@ -139,67 +109,109 @@ Use the buttons below to manage your voice channel.
       const action = interaction.customId;
 
       if (!channel)
-        return interaction.reply({ content: "<:xx_no:1481734627193520323> You are not in a voice channel!", ephemeral: true });
+        return interaction.reply({
+          embeds: [new EmbedBuilder().setDescription("<:xx_no:1481734627193520323> You are not in a **voice channel**!").setColor(null)],
+          ephemeral: true
+        });
 
       const ownerId = vcOwners.get(channel.id);
+
       if (ownerId && ownerId !== member.id)
-        return interaction.reply({ content: "<:xx_no:1481734627193520323> You do not own this voice channel!", ephemeral: true });
+        return interaction.reply({
+          embeds: [new EmbedBuilder().setDescription("<:xx_no:1481734627193520323> You do not own this **voice channel**!").setColor(null)],
+          ephemeral: true
+        });
 
       try {
+
         const msg = await performVoiceChannelAction(action, member, channel);
-        return interaction.reply({ content: msg, ephemeral: true });
+
+        return interaction.reply({
+          embeds: [new EmbedBuilder().setDescription(msg).setColor(null)],
+          ephemeral: true
+        });
+
       } catch (err) {
+
         console.error(err);
-        return interaction.reply({ content: "<:xx_no:1481734627193520323> Failed to perform this action!", ephemeral: true });
+
+        return interaction.reply({
+          embeds: [new EmbedBuilder().setDescription("<:xx_no:1481734627193520323> Failed to perform this action!").setColor(null)],
+          ephemeral: true
+        });
+
       }
+
     });
-  },
+
+  }
+
 };
 
 // --------------------------
 // Helper: perform actions
 // --------------------------
+
 async function performVoiceChannelAction(action, member, channel, extraArgs = []) {
+
   const guild = channel.guild;
+
   switch (action) {
+
     case "lock":
       await channel.permissionOverwrites.edit(guild.roles.everyone, { Connect: false });
-      if (config.PRIVATE_VC_CATEGORY) await channel.setParent(config.PRIVATE_VC_CATEGORY);
-      return "<:xx_yes:1481734672416378902> Your voice channel is now **locked**!";
+      if (config.PRIVATE_VC_CATEGORY) await channel.setParent(config.PRIVATE_VC_CATEGORY).catch(() => {});
+      return "<:xx_yes:1481734672416378902> Your **voice channel** is now **locked**!";
+
     case "unlock":
       await channel.permissionOverwrites.edit(guild.roles.everyone, { Connect: true });
-      if (config.PUBLIC_VC_CATEGORY) await channel.setParent(config.PUBLIC_VC_CATEGORY);
-      return "<:xx_yes:1481734672416378902> Your voice channel is now **unlocked**!";
+      if (config.PUBLIC_VC_CATEGORY) await channel.setParent(config.PUBLIC_VC_CATEGORY).catch(() => {});
+      return "<:xx_yes:1481734672416378902> Your **voice channel** is now **unlocked**!";
+
     case "hide":
       await channel.permissionOverwrites.edit(guild.roles.everyone, { ViewChannel: false });
-      if (config.PRIVATE_VC_CATEGORY) await channel.setParent(config.PRIVATE_VC_CATEGORY);
-      return "<:xx_yes:1481734672416378902> Your voice channel is now **hidden**!";
+      if (config.PRIVATE_VC_CATEGORY) await channel.setParent(config.PRIVATE_VC_CATEGORY).catch(() => {});
+      return "<:xx_yes:1481734672416378902> Your **voice channel** is now **hidden**!";
+
     case "reveal":
       await channel.permissionOverwrites.edit(guild.roles.everyone, { ViewChannel: true });
-      if (config.PUBLIC_VC_CATEGORY) await channel.setParent(config.PUBLIC_VC_CATEGORY);
-      return "<:xx_yes:1481734672416378902> Your voice channel is now **visible**!";
+      if (config.PUBLIC_VC_CATEGORY) await channel.setParent(config.PUBLIC_VC_CATEGORY).catch(() => {});
+      return "<:xx_yes:1481734672416378902> Your **voice channel** is now **visible**!";
+
     case "rename":
       const name = extraArgs.join(" ");
       if (!name) return "<:xx_no:1481734627193520323> You must provide a new name!";
       await channel.setName(name);
-      return `<:xx_yes:1481734672416378902> Your voice channel has been renamed to **${name}**!`;
+      return `<:xx_yes:1481734672416378902> Your **voice channel** has been renamed to **${name}**!`;
+
     case "increase":
       await channel.setUserLimit(channel.userLimit + 1);
       return "<:xx_yes:1481734672416378902> Member limit increased!";
+
     case "decrease":
-      await channel.setUserLimit(channel.userLimit - 1);
+      await channel.setUserLimit(Math.max(0, channel.userLimit - 1));
       return "<:xx_yes:1481734672416378902> Member limit decreased!";
+
     case "kick":
-      const target = channel.members.find((m) => m.id !== member.id);
+      const target = channel.members.find(m => m.id !== member.id);
       if (!target) return "<:xx_no:1481734627193520323> No one to kick!";
       await target.voice.disconnect();
-      return `<:xx_yes:1481734672416378902> ${target.displayName} has been kicked!`;
+      return `<:xx_yes:1481734672416378902> ${target.displayName} has been kicked from the **voice channel**!`;
+
     case "info":
-      return `<:xx_yes:1481734672416378902> Voice channel info: ${channel.members.size}/${channel.userLimit}`;
-    case "claim":
+      return `<:xx_yes:1481734672416378902> Voice channel info: ${channel.members.size}/${channel.userLimit || "∞"}`;
+
+    case "claim": {
+      const currentOwner = vcOwners.get(channel.id);
+      if (currentOwner && channel.members.has(currentOwner)) {
+        return "<:xx_no:1481734627193520323> This **voice channel** already has an active owner!";
+      }
       vcOwners.set(channel.id, member.id);
-      return "<:xx_yes:1481734672416378902> You now **own** this voice channel!";
+      return "<:xx_yes:1481734672416378902> You now **own** this **voice channel**!";
+    }
+
     default:
       return "<:xx_no:1481734627193520323> Unknown action!";
   }
+
 }
