@@ -1,8 +1,7 @@
 const { Client, GatewayIntentBits, Partials } = require("discord.js");
 const express = require("express");
 const config = require("./config");
-const welcome = require("./welcome");
-const VoiceMaster = require("./VoiceMaster");
+const voiceMaster = require("./voiceMaster"); // your VC module
 
 const client = new Client({
   intents: [
@@ -23,23 +22,23 @@ app.listen(config.PORT, () => console.log(`Bot running on port ${config.PORT}`))
 // Welcome system
 client.on("guildMemberAdd", async (member) => {
   if (member.guild.id !== config.ALLOWED_GUILD) return;
-  await welcome.handleJoin(member);
+  if (typeof require("./welcome").handleJoin === "function") {
+    await require("./welcome").handleJoin(member);
+  }
 });
 
-// --------------------------
-// VoiceMaster command listener
-// --------------------------
+// Command handling
 client.on("messageCreate", async (message) => {
-  if (message.guild?.id !== config.ALLOWED_GUILD) return;
-  if (message.author.bot) return;
+  if (!message.guild || message.author.bot) return;
 
-  await VoiceMaster.execute(client, message);
+  // Pass to VoiceMaster commands
+  if (message.content.startsWith(config.PREFIX)) {
+    await voiceMaster.execute(client, message);
+  }
 });
 
-// --------------------------
-// VoiceMaster voice listeners
-// --------------------------
-VoiceMaster.setupVoiceListeners(client);
+// Setup voice listeners for join-to-create, buttons, etc.
+voiceMaster.setupVoiceListeners(client);
 
-// Login
+// Login bot
 client.login(config.TOKEN);
