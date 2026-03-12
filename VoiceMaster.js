@@ -1,4 +1,4 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Events } = require("discord.js");
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, ChannelType } = require("discord.js");
 const config = require("./config");
 
 // Track ownership for voice channels
@@ -9,7 +9,7 @@ module.exports = {
     if (!message.content.startsWith(config.PREFIX)) return;
 
     const args = message.content.slice(config.PREFIX.length).trim().split(/ +/);
-    const command = args.shift().toLowerCase();
+    const command = args.shift()?.toLowerCase();
     const member = message.member;
     const channel = member.voice.channel;
 
@@ -18,7 +18,6 @@ module.exports = {
     // --------------------------
     if (command === "interface") {
       const guild = message.guild;
-
       const embed = new EmbedBuilder()
         .setTitle("VoiceMaster Interface")
         .setAuthor({ name: guild.name, iconURL: guild.iconURL({ dynamic: true }) })
@@ -90,7 +89,7 @@ Use the buttons below to manage your voice channel.
           const guild = newState.guild;
           const vc = await guild.channels.create({
             name: `${member.displayName}'s channel`,
-            type: 2, // GUILD_VOICE
+            type: ChannelType.GuildVoice,
             parent: config.PUBLIC_VC_CATEGORY,
             permissionOverwrites: [
               { id: guild.roles.everyone.id, allow: ["Connect", "Speak"] },
@@ -102,10 +101,10 @@ Use the buttons below to manage your voice channel.
 
           // Auto-delete empty channel
           const interval = setInterval(async () => {
-            if (vc.deleted) return clearInterval(interval);
-            if (vc.members.size === 0) {
+            const fetched = await guild.channels.fetch(vc.id).catch(() => null);
+            if (!fetched || fetched.members.size === 0) {
               clearInterval(interval);
-              await vc.delete().catch(() => {});
+              if (fetched) await fetched.delete().catch(() => {});
               vcOwners.delete(vc.id);
             }
           }, 5000);
