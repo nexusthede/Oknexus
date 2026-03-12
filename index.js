@@ -2,7 +2,7 @@ const { Client, GatewayIntentBits, Partials } = require("discord.js");
 const express = require("express");
 const config = require("./config");
 const welcome = require("./welcome");
-const voiceMaster = require("./VoiceMaster"); // Added VoiceMaster
+const VoiceMaster = require("./VoiceMaster");
 
 const client = new Client({
   intents: [
@@ -26,14 +26,20 @@ client.on("guildMemberAdd", async (member) => {
   await welcome.handleJoin(member);
 });
 
-// Message commands (VoiceMaster)
+// --------------------------
+// VoiceMaster command listener
+// --------------------------
 client.on("messageCreate", async (message) => {
   if (message.guild?.id !== config.ALLOWED_GUILD) return;
-  await voiceMaster.execute(client, message).catch(console.error);
+  if (message.author.bot) return;
+
+  await VoiceMaster.execute(client, message);
 });
 
-// Setup voice listeners (Join-to-Create & Join-to-Unmute)
-voiceMaster.setupVoiceListeners(client);
+// --------------------------
+// VoiceMaster voice listeners
+// --------------------------
+VoiceMaster.setupVoiceListeners(client);
 
-// Login bot
+// Login
 client.login(config.TOKEN);
