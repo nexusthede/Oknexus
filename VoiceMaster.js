@@ -1,7 +1,7 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Events } = require("discord.js");
 const config = require("./config");
 
-// Track ownership for VoiceMaster & Private voice channels
+// Track ownership for voice channels
 const vcOwners = new Map();
 
 module.exports = {
@@ -25,16 +25,16 @@ module.exports = {
         .setDescription(`
 Use the buttons below to manage your voice channel.
 
-<:vc_lock:1477309124537483439> - Lock your voice channel  
-<:vc_unlock:1477309329433559203> - Unlock your voice channel  
-<:vc_hide:1477311897262096497> - Hide your voice channel  
-<:vc_unhide:1477311594638606336> - Reveal your voice channel  
-<:vc_rename:1477312271926431987> - Rename your voice channel  
-<:vc_decrease:1477690349366280263> - Decrease the member limit  
-<:vc_increase:1477690326830287080> - Increase the member limit  
-<:vc_info:1477312480463294628> - Info about your voice channel  
-<:vc_kick:1477311772137619478> - Kick someone from your voice channel  
-<:vc_claim:1477559856394403942> - Claim ownership of your voice channel
+<:vc_lock:1477309124537483439> - [\`Lock\`](https://discord.gg/3ytNyU2qtj) your voice channel  
+<:vc_unlock:1477309329433559203> - [\`Unlock\`](https://discord.gg/3ytNyU2qtj) your voice channel  
+<:vc_hide:1477311897262096497> - [\`Hide\`](https://discord.gg/3ytNyU2qtj) your voice channel  
+<:vc_unhide:1477311594638606336> - [\`Reveal\`](https://discord.gg/3ytNyU2qtj) your voice channel  
+<:vc_rename:1477312271926431987> - [\`Rename\`](https://discord.gg/3ytNyU2qtj) your voice channel  
+<:vc_decrease:1477690349366280263> - [\`Decrease\`](https://discord.gg/3ytNyU2qtj) the member limit  
+<:vc_increase:1477690326830287080> - [\`Increase\`](https://discord.gg/3ytNyU2qtj) the member limit  
+<:vc_info:1477312480463294628> - [\`Info\`](https://discord.gg/3ytNyU2qtj) about your voice channel  
+<:vc_kick:1477311772137619478> - [\`Kick\`](https://discord.gg/3ytNyU2qtj) someone from your voice channel  
+<:vc_claim:1477559856394403942> - [\`Claim\`](https://discord.gg/3ytNyU2qtj) ownership of your voice channel
         `)
         .setColor(null);
 
@@ -61,9 +61,9 @@ Use the buttons below to manage your voice channel.
     }
 
     // --------------------------
-    // ,voicechannel <action> commands
+    // ,vc <action> commands
     // --------------------------
-    if (command === "voicechannel") {
+    if (command === "vc") {
       const action = args.shift()?.toLowerCase();
       if (!channel) return message.reply("<:xx_no:1481734627193520323> You are not in a voice channel!");
 
@@ -89,9 +89,9 @@ Use the buttons below to manage your voice channel.
         try {
           const guild = newState.guild;
           const vc = await guild.channels.create({
-            name: `${member.user.username}'s VoiceMaster`,
+            name: `${member.displayName}'s channel`,
             type: 2, // GUILD_VOICE
-            parent: config.VOICEMASTER_CATEGORY,
+            parent: config.PUBLIC_VC_CATEGORY,
             permissionOverwrites: [
               { id: guild.roles.everyone.id, allow: ["Connect", "Speak"] },
             ],
@@ -105,18 +105,10 @@ Use the buttons below to manage your voice channel.
             if (vc.deleted) return clearInterval(interval);
             if (vc.members.size === 0) {
               clearInterval(interval);
-
-              // Move to public VC if any members left (rare)
-              const publicCategory = guild.channels.cache.get(config.PUBLIC_VC_CATEGORY);
-              vc.members.forEach((m) => {
-                if (publicCategory && publicCategory.children.first())
-                  m.voice.setChannel(publicCategory.children.first()).catch(() => {});
-              });
-
               await vc.delete().catch(() => {});
               vcOwners.delete(vc.id);
             }
-          }, 10000);
+          }, 5000);
         } catch (err) {
           console.error("Join-to-Create Error:", err);
         }
@@ -142,14 +134,12 @@ Use the buttons below to manage your voice channel.
       const channel = member.voice.channel;
       const action = interaction.customId;
 
-      if (!channel) {
+      if (!channel)
         return interaction.reply({ content: "<:xx_no:1481734627193520323> You are not in a voice channel!", ephemeral: true });
-      }
 
       const ownerId = vcOwners.get(channel.id);
-      if (ownerId && ownerId !== member.id) {
+      if (ownerId && ownerId !== member.id)
         return interaction.reply({ content: "<:xx_no:1481734627193520323> You do not own this voice channel!", ephemeral: true });
-      }
 
       try {
         await performVoiceChannelAction(action, member, channel);
@@ -159,7 +149,7 @@ Use the buttons below to manage your voice channel.
         return interaction.reply({ content: "<:xx_no:1481734627193520323> Failed to perform this action!", ephemeral: true });
       }
     });
-  }
+  },
 };
 
 // --------------------------
@@ -194,7 +184,7 @@ async function performVoiceChannelAction(action, member, channel, extraArgs = []
       const target = channel.members.find((m) => m.id !== member.id);
       if (!target) return member.send("<:xx_no:1481734627193520323> No one to kick!").catch(() => {});
       await target.voice.disconnect();
-      return member.send(`<:xx_yes:1481734672416378902> ${target.user.username} has been kicked!`).catch(() => {});
+      return member.send(`<:xx_yes:1481734672416378902> ${target.displayName} has been kicked!`).catch(() => {});
     case "info":
       return member.send(`<:xx_yes:1481734672416378902> Voice channel info: ${channel.members.size}/${channel.userLimit}`).catch(() => {});
     case "claim":
