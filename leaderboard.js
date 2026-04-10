@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require("discord.js");
+const { EmbedBuilder, PermissionsBitField } = require("discord.js");
 const db = require("./db");
 
 // format VC time
@@ -25,6 +25,7 @@ function resetIn() {
   return `${d}d ${h}h ${m}m`;
 }
 
+// VC embed
 function buildVC(guild) {
   const top = db.prepare(`
     SELECT * FROM vc_time
@@ -47,6 +48,7 @@ function buildVC(guild) {
     .setFooter({ text: "Updates every 10 mins • Resets weekly" });
 }
 
+// CHAT embed
 function buildCHAT(guild) {
   const top = db.prepare(`
     SELECT * FROM chat_time
@@ -69,4 +71,31 @@ function buildCHAT(guild) {
     .setFooter({ text: "Updates every 10 mins • Resets weekly" });
 }
 
-module.exports = { buildVC, buildCHAT };
+// ADMIN COMMANDS (PREFIX =)
+async function handleCommands(message) {
+  if (!message.guild || message.author.bot) return;
+
+  const isAdmin = message.member.permissions.has(
+    PermissionsBitField.Flags.Administrator
+  );
+
+  if (!isAdmin) return;
+
+  const cmd = message.content.toLowerCase();
+
+  if (cmd === "=vclb") {
+    return message.channel.send({ embeds: [buildVC(message.guild)] });
+  }
+
+  if (cmd === "=chatlb") {
+    return message.channel.send({ embeds: [buildCHAT(message.guild)] });
+  }
+
+  if (cmd === "=lb") {
+    return message.channel.send({
+      embeds: [buildVC(message.guild), buildCHAT(message.guild)]
+    });
+  }
+}
+
+module.exports = { buildVC, buildCHAT, handleCommands };
