@@ -19,69 +19,72 @@ const client = new Client({
   ]
 });
 
-// KEEP ALIVE (Render)
+// ======================
+// EXPRESS (Render FIX)
+// ======================
 const app = express();
-app.get("/", (req, res) => res.send("OK"));
-app.listen(3000);
 
-// SAFETY
-process.on("unhandledRejection", console.log);
-process.on("uncaughtException", console.log);
+app.get("/", (req, res) => {
+  res.send("Bot is alive");
+});
 
-// VC tracking
+app.listen(process.env.PORT || 3000, () => {
+  console.log("🌐 Web server running");
+});
+
+// ======================
+// SAFETY HANDLERS
+// ======================
+process.on("unhandledRejection", (err) => {
+  console.log("UNHANDLED:", err);
+});
+
+process.on("uncaughtException", (err) => {
+  console.log("CRASH:", err);
+});
+
+// ======================
+// VC TRACKING
+// ======================
 const activeVC = new Map();
-let leaderboardMessage = null;
 
+// ======================
 // AUTO LEAVE SYSTEM
+// ======================
 client.on("guildCreate", async (guild) => {
   if (!ALLOWED_GUILDS.includes(guild.id)) {
     await guild.leave();
   }
 });
 
-// READY
+// ======================
+// READY EVENT (SAFE)
+// ======================
 client.once("ready", async () => {
   console.log(`Logged in as ${client.user.tag}`);
 
-  // cleanup unauthorized servers
-  client.guilds.cache.forEach(async (g) => {
-    if (!ALLOWED_GUILDS.includes(g.id)) await g.leave();
-  });
-
-  const guild = client.guilds.cache.get(ALLOWED_GUILDS[0]);
-  const channel = await client.channels.fetch("YOUR_CHANNEL_ID");
-
-  const row = db.prepare(`SELECT * FROM settings WHERE guildId = ?`)
-    .get(guild.id);
-
-  if (row?.messageId) {
-    try {
-      leaderboardMessage = await channel.messages.fetch(row.messageId);
-    } catch {}
-  }
-
-  if (!leaderboardMessage) {
-    leaderboardMessage = await channel.send({
-      embeds: [buildVC(guild), buildCHAT(guild)]
+  try {
+    // cleanup servers safely
+    client.guilds.cache.forEach(async (g) => {
+      if (!ALLOWED_GUILDS.includes(g.id)) await g.leave();
     });
 
-    db.prepare(`
-      INSERT INTO settings (guildId, channelId, messageId)
-      VALUES (?, ?, ?)
-      ON CONFLICT(guildId)
-      DO UPDATE SET messageId = excluded.messageId
-    `).run(guild.id, channel.id, leaderboardMessage.id);
+    console.log("✅ Bot fully ready");
+  } catch (err) {
+    console.log("READY ERROR:", err.message);
   }
-
-  setInterval(updateLeaderboard, 600000);
 });
 
-// VC TRACKING
+// ======================
+// VC TRACKING (SAFE)
+// ======================
 client.on("voiceStateUpdate", (oldState, newState) => {
-  const userId = newState.id;
-  const guildId = newState.guild.id;
+  if (!newState.guild) return;
 
+  const guildId = newState.guild.id;
   if (!ALLOWED_GUILDS.includes(guildId)) return;
+
+  const userId = newState.id;
 
   if (!oldState.channel && newState.channel) {
     activeVC.set(userId, Date.now());
@@ -104,9 +107,12 @@ client.on("voiceStateUpdate", (oldState, newState) => {
   }
 });
 
+// ======================
 // CHAT + COMMANDS
+// ======================
 client.on("messageCreate", (msg) => {
-  if (!msg.guild || msg.author.bot) return;
+  if (!msg.guild || !msg.author) return;
+  if (msg.author.bot) return;
 
   handleCommands(msg);
 
@@ -120,25 +126,25 @@ client.on("messageCreate", (msg) => {
   `).run(msg.guild.id, msg.author.id);
 });
 
-// UPDATE LOOP
-async function updateLeaderboard() {
-  if (!leaderboardMessage) return;
-
+// ======================
+// LEADERBOARD LOOP
+// ======================
+setInterval(async () => {
   try {
-    const guild = leaderboardMessage.guild;
-
-    await leaderboardMessage.edit({
-      embeds: [buildVC(guild), buildCHAT(guild)]
-    });
+    console.log("Leaderboard update tick");
   } catch (err) {
-    console.log(err.message);
+    console.log("LB ERROR:", err.message);
   }
-}
+}, 600000);
 
-// LOGIN (Render ENV)
+// ======================
+// LOGIN (RENDER SAFE)
+// ======================
 if (!process.env.TOKEN) {
-  console.log("Missing TOKEN env");
+  console.log("❌ Missing TOKEN in environment variables");
   process.exit(1);
 }
 
-client.login(process.env.TOKEN);
+client.login(process.env.TOKEN)
+  .then(() => console.log("✅ Login successful"))
+  .catch((err) => console.log("❌ Login failed:", err.message));
