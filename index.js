@@ -4,80 +4,51 @@ const express = require("express");
 const db = require("./db");
 const { buildVC, buildCHAT, handleCommands } = require("./leaderboard");
 
-// ALLOWED SERVERS ONLY
 const ALLOWED_GUILDS = [
   "1449708401050259457",
   "1475371068507160586"
 ];
 
+console.log("🚀 Starting bot...");
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildVoiceStates
   ]
 });
 
-// ======================
-// EXPRESS (Render FIX)
-// ======================
+// EXPRESS (Render safe)
 const app = express();
-
-app.get("/", (req, res) => {
-  res.send("Bot is alive");
-});
+app.get("/", (req, res) => res.send("Bot is alive"));
 
 app.listen(process.env.PORT || 3000, () => {
   console.log("🌐 Web server running");
 });
 
-// ======================
-// SAFETY HANDLERS
-// ======================
-process.on("unhandledRejection", (err) => {
-  console.log("UNHANDLED:", err);
-});
+// SAFETY
+process.on("unhandledRejection", console.log);
+process.on("uncaughtException", console.log);
 
-process.on("uncaughtException", (err) => {
-  console.log("CRASH:", err);
-});
-
-// ======================
-// VC TRACKING
-// ======================
+// VC tracking
 const activeVC = new Map();
 
-// ======================
-// AUTO LEAVE SYSTEM
-// ======================
-client.on("guildCreate", async (guild) => {
-  if (!ALLOWED_GUILDS.includes(guild.id)) {
-    await guild.leave();
-  }
-});
-
-// ======================
-// READY EVENT (SAFE)
-// ======================
+// READY
 client.once("ready", async () => {
-  console.log(`Logged in as ${client.user.tag}`);
+  console.log("✅ Logged in as", client.user.tag);
 
-  try {
-    // cleanup servers safely
-    client.guilds.cache.forEach(async (g) => {
-      if (!ALLOWED_GUILDS.includes(g.id)) await g.leave();
-    });
-
-    console.log("✅ Bot fully ready");
-  } catch (err) {
-    console.log("READY ERROR:", err.message);
+  for (const g of client.guilds.cache.values()) {
+    if (!ALLOWED_GUILDS.includes(g.id)) {
+      await g.leave();
+    }
   }
+
+  console.log("✅ Ready complete");
 });
 
-// ======================
-// VC TRACKING (SAFE)
-// ======================
+// VC TRACKING
 client.on("voiceStateUpdate", (oldState, newState) => {
   if (!newState.guild) return;
 
@@ -107,12 +78,9 @@ client.on("voiceStateUpdate", (oldState, newState) => {
   }
 });
 
-// ======================
 // CHAT + COMMANDS
-// ======================
 client.on("messageCreate", (msg) => {
-  if (!msg.guild || !msg.author) return;
-  if (msg.author.bot) return;
+  if (!msg.guild || msg.author.bot) return;
 
   handleCommands(msg);
 
@@ -126,25 +94,12 @@ client.on("messageCreate", (msg) => {
   `).run(msg.guild.id, msg.author.id);
 });
 
-// ======================
-// LEADERBOARD LOOP
-// ======================
-setInterval(async () => {
-  try {
-    console.log("Leaderboard update tick");
-  } catch (err) {
-    console.log("LB ERROR:", err.message);
-  }
-}, 600000);
-
-// ======================
-// LOGIN (RENDER SAFE)
-// ======================
+// LOGIN SAFE
 if (!process.env.TOKEN) {
-  console.log("❌ Missing TOKEN in environment variables");
+  console.log("❌ Missing TOKEN");
   process.exit(1);
 }
 
 client.login(process.env.TOKEN)
-  .then(() => console.log("✅ Login successful"))
-  .catch((err) => console.log("❌ Login failed:", err.message));
+  .then(() => console.log("✅ Login success"))
+  .catch(err => console.log("❌ Login failed:", err));
