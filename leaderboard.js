@@ -8,14 +8,13 @@ function format(sec) {
   return `${h}h ${m}m`;
 }
 
-// reset countdown
+// SAFE weekly reset (no timezone bugs)
 function resetIn() {
   const now = new Date();
   const next = new Date();
-  const diff = (7 - now.getDay()) % 7;
 
-  next.setDate(now.getDate() + diff);
-  next.setHours(0, 0, 0, 0);
+  next.setUTCHours(0, 0, 0, 0);
+  next.setUTCDate(next.getUTCDate() + ((7 - next.getUTCDay()) % 7));
 
   const ms = next - now;
   const d = Math.floor(ms / 86400000);
@@ -25,7 +24,7 @@ function resetIn() {
   return `${d}d ${h}h ${m}m`;
 }
 
-// VC embed
+// VC LEADERBOARD
 function buildVC(guild) {
   const top = db.prepare(`
     SELECT * FROM vc_time
@@ -34,21 +33,21 @@ function buildVC(guild) {
     LIMIT 10
   `).all(guild.id);
 
-  let desc = top.map((u, i) =>
-    `**${i + 1}.** <@${u.userId}> - ${format(u.time)}`
-  ).join("\n");
-
-  desc += `\n\nResets in: ${resetIn()}`;
+  const desc = top.length
+    ? top.map((u, i) =>
+        `**${i + 1}.** <@${u.userId}> - ${format(u.time)}`
+      ).join("\n")
+    : "No VC data yet.";
 
   return new EmbedBuilder()
     .setTitle("Voice Leaderboard")
     .setColor("#2B2D31")
-    .setThumbnail(guild.iconURL({ dynamic: true }))
-    .setDescription(desc)
+    .setThumbnail(guild.iconURL({ dynamic: true }) || null)
+    .setDescription(`${desc}\n\nResets in: ${resetIn()}`)
     .setFooter({ text: "Updates every 10 mins • Resets weekly" });
 }
 
-// CHAT embed
+// CHAT LEADERBOARD
 function buildCHAT(guild) {
   const top = db.prepare(`
     SELECT * FROM chat_time
@@ -57,21 +56,21 @@ function buildCHAT(guild) {
     LIMIT 10
   `).all(guild.id);
 
-  let desc = top.map((u, i) =>
-    `**${i + 1}.** <@${u.userId}> - ${u.messages} msgs`
-  ).join("\n");
-
-  desc += `\n\nResets in: ${resetIn()}`;
+  const desc = top.length
+    ? top.map((u, i) =>
+        `**${i + 1}.** <@${u.userId}> - ${u.messages} msgs`
+      ).join("\n")
+    : "No chat data yet.";
 
   return new EmbedBuilder()
     .setTitle("Chat Leaderboard")
     .setColor("#2B2D31")
-    .setThumbnail(guild.iconURL({ dynamic: true }))
-    .setDescription(desc)
+    .setThumbnail(guild.iconURL({ dynamic: true }) || null)
+    .setDescription(`${desc}\n\nResets in: ${resetIn()}`)
     .setFooter({ text: "Updates every 10 mins • Resets weekly" });
 }
 
-// ADMIN COMMANDS (PREFIX =)
+// ADMIN COMMANDS (= prefix)
 async function handleCommands(message) {
   if (!message.guild || message.author.bot) return;
 
