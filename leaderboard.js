@@ -74,7 +74,9 @@ function handleCommands(message) {
     PermissionsBitField.Flags.Administrator
   );
 
-  if (!isAdmin) return;
+  if (!isAdmin) {
+    return message.reply("❌ Admin only command.");
+  }
 
   const cmd = message.content.toLowerCase();
 
