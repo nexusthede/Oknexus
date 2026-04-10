@@ -104,7 +104,7 @@ client.on("voiceStateUpdate", (oldState, newState) => {
   }
 });
 
-// CHAT TRACKING + COMMANDS
+// CHAT + COMMANDS
 client.on("messageCreate", (msg) => {
   if (!msg.guild || msg.author.bot) return;
 
@@ -135,7 +135,7 @@ async function updateLeaderboard() {
   }
 }
 
-// LOGIN (Render ENV TOKEN)
+// LOGIN (Render ENV)
 if (!process.env.TOKEN) {
   console.log("Missing TOKEN env");
   process.exit(1);
