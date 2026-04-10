@@ -2,9 +2,9 @@ const { Client, GatewayIntentBits } = require("discord.js");
 const express = require("express");
 
 const db = require("./db");
-const { buildVC, buildCHAT } = require("./leaderboard");
+const { buildVC, buildCHAT, handleCommands } = require("./leaderboard");
 
-// ONLY ALLOWED SERVERS
+// ALLOWED SERVERS ONLY
 const ALLOWED_GUILDS = [
   "1449708401050259457",
   "1475371068507160586"
@@ -19,61 +19,40 @@ const client = new Client({
   ]
 });
 
-// =====================
-// RENDER KEEP ALIVE
-// =====================
+// KEEP ALIVE (Render)
 const app = express();
+app.get("/", (req, res) => res.send("OK"));
+app.listen(3000);
 
-app.get("/", (req, res) => {
-  res.send("Bot is running");
-});
-
-app.listen(3000, () => {
-  console.log("Keep-alive server started");
-});
-
-// =====================
-// SAFETY HANDLERS
-// =====================
+// SAFETY
 process.on("unhandledRejection", console.log);
 process.on("uncaughtException", console.log);
 
-// =====================
-// VC TRACKING
-// =====================
+// VC tracking
 const activeVC = new Map();
 let leaderboardMessage = null;
 
-// =====================
 // AUTO LEAVE SYSTEM
-// =====================
 client.on("guildCreate", async (guild) => {
   if (!ALLOWED_GUILDS.includes(guild.id)) {
-    console.log(`Left server: ${guild.name}`);
     await guild.leave();
   }
 });
 
-// =====================
-// READY EVENT
-// =====================
+// READY
 client.once("ready", async () => {
   console.log(`Logged in as ${client.user.tag}`);
 
-  // remove unauthorized servers on restart
-  client.guilds.cache.forEach(async (guild) => {
-    if (!ALLOWED_GUILDS.includes(guild.id)) {
-      await guild.leave();
-    }
+  // cleanup unauthorized servers
+  client.guilds.cache.forEach(async (g) => {
+    if (!ALLOWED_GUILDS.includes(g.id)) await g.leave();
   });
 
   const guild = client.guilds.cache.get(ALLOWED_GUILDS[0]);
-
   const channel = await client.channels.fetch("YOUR_CHANNEL_ID");
 
-  const row = db.prepare(`
-    SELECT * FROM settings WHERE guildId = ?
-  `).get(guild.id);
+  const row = db.prepare(`SELECT * FROM settings WHERE guildId = ?`)
+    .get(guild.id);
 
   if (row?.messageId) {
     try {
@@ -83,10 +62,7 @@ client.once("ready", async () => {
 
   if (!leaderboardMessage) {
     leaderboardMessage = await channel.send({
-      embeds: [
-        buildVC(guild),
-        buildCHAT(guild)
-      ]
+      embeds: [buildVC(guild), buildCHAT(guild)]
     });
 
     db.prepare(`
@@ -100,9 +76,7 @@ client.once("ready", async () => {
   setInterval(updateLeaderboard, 600000);
 });
 
-// =====================
 // VC TRACKING
-// =====================
 client.on("voiceStateUpdate", (oldState, newState) => {
   const userId = newState.id;
   const guildId = newState.guild.id;
@@ -130,11 +104,12 @@ client.on("voiceStateUpdate", (oldState, newState) => {
   }
 });
 
-// =====================
-// CHAT TRACKING
-// =====================
+// CHAT TRACKING + COMMANDS
 client.on("messageCreate", (msg) => {
   if (!msg.guild || msg.author.bot) return;
+
+  handleCommands(msg);
+
   if (!ALLOWED_GUILDS.includes(msg.guild.id)) return;
 
   db.prepare(`
@@ -145,9 +120,7 @@ client.on("messageCreate", (msg) => {
   `).run(msg.guild.id, msg.author.id);
 });
 
-// =====================
-// LEADERBOARD UPDATE
-// =====================
+// UPDATE LOOP
 async function updateLeaderboard() {
   if (!leaderboardMessage) return;
 
@@ -155,21 +128,16 @@ async function updateLeaderboard() {
     const guild = leaderboardMessage.guild;
 
     await leaderboardMessage.edit({
-      embeds: [
-        buildVC(guild),
-        buildCHAT(guild)
-      ]
+      embeds: [buildVC(guild), buildCHAT(guild)]
     });
   } catch (err) {
-    console.log("Leaderboard update failed:", err.message);
+    console.log(err.message);
   }
 }
 
-// =====================
-// LOGIN (RENDER TOKEN FIX)
-// =====================
+// LOGIN (Render ENV TOKEN)
 if (!process.env.TOKEN) {
-  console.log("ERROR: Missing TOKEN in environment variables");
+  console.log("Missing TOKEN env");
   process.exit(1);
 }
 
