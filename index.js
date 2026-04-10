@@ -1,15 +1,9 @@
+console.log("🚀 BOT STARTING...");
+
 const { Client, GatewayIntentBits } = require("discord.js");
 const express = require("express");
-
 const db = require("./db");
-const { buildVC, buildCHAT, handleCommands } = require("./leaderboard");
-
-const ALLOWED_GUILDS = [
-  "1449708401050259457",
-  "1475371068507160586"
-];
-
-console.log("🚀 Starting bot...");
+const { handleCommands } = require("./leaderboard");
 
 const client = new Client({
   intents: [
@@ -20,42 +14,32 @@ const client = new Client({
   ]
 });
 
-// EXPRESS (Render safe)
+// EXPRESS (Render KEEP ALIVE)
 const app = express();
-app.get("/", (req, res) => res.send("Bot is alive"));
+app.get("/", (req, res) => res.send("OK"));
 
 app.listen(process.env.PORT || 3000, () => {
-  console.log("🌐 Web server running");
+  console.log("🌐 Web running");
 });
 
-// SAFETY
-process.on("unhandledRejection", console.log);
-process.on("uncaughtException", console.log);
+// SAFETY (CRASH DETECTION)
+process.on("unhandledRejection", (e) => console.log("UNHANDLED:", e));
+process.on("uncaughtException", (e) => console.log("CRASH:", e));
 
-// VC tracking
+// VC TRACKING
 const activeVC = new Map();
 
 // READY
-client.once("ready", async () => {
-  console.log("✅ Logged in as", client.user.tag);
-
-  for (const g of client.guilds.cache.values()) {
-    if (!ALLOWED_GUILDS.includes(g.id)) {
-      await g.leave();
-    }
-  }
-
-  console.log("✅ Ready complete");
+client.once("ready", () => {
+  console.log("✅ LOGGED IN:", client.user.tag);
 });
 
-// VC TRACKING
+// VC
 client.on("voiceStateUpdate", (oldState, newState) => {
   if (!newState.guild) return;
 
-  const guildId = newState.guild.id;
-  if (!ALLOWED_GUILDS.includes(guildId)) return;
-
   const userId = newState.id;
+  const guildId = newState.guild.id;
 
   if (!oldState.channel && newState.channel) {
     activeVC.set(userId, Date.now());
@@ -67,12 +51,10 @@ client.on("voiceStateUpdate", (oldState, newState) => {
 
     const time = Math.floor((Date.now() - start) / 1000);
 
-    db.prepare(`
-      INSERT INTO vc_time (guildId, userId, time)
-      VALUES (?, ?, ?)
-      ON CONFLICT(guildId, userId)
-      DO UPDATE SET time = time + ?
-    `).run(guildId, userId, time, time);
+    db.run(`
+      INSERT OR REPLACE INTO vc_time (guildId, userId, time)
+      VALUES (?, ?, COALESCE((SELECT time FROM vc_time WHERE guildId=? AND userId=?),0)+?)
+    `, [guildId, userId, guildId, userId, time]);
 
     activeVC.delete(userId);
   }
@@ -84,22 +66,18 @@ client.on("messageCreate", (msg) => {
 
   handleCommands(msg);
 
-  if (!ALLOWED_GUILDS.includes(msg.guild.id)) return;
-
-  db.prepare(`
-    INSERT INTO chat_time (guildId, userId, messages)
-    VALUES (?, ?, 1)
-    ON CONFLICT(guildId, userId)
-    DO UPDATE SET messages = messages + 1
-  `).run(msg.guild.id, msg.author.id);
+  db.run(`
+    INSERT OR REPLACE INTO chat_time (guildId, userId, messages)
+    VALUES (?, ?, COALESCE((SELECT messages FROM chat_time WHERE guildId=? AND userId=?),0)+1)
+  `, [msg.guild.id, msg.author.id, msg.guild.id, msg.author.id]);
 });
 
-// LOGIN SAFE
+// LOGIN (THIS IS YOUR MAIN FIX)
 if (!process.env.TOKEN) {
-  console.log("❌ Missing TOKEN");
+  console.log("❌ TOKEN MISSING");
   process.exit(1);
 }
 
 client.login(process.env.TOKEN)
-  .then(() => console.log("✅ Login success"))
-  .catch(err => console.log("❌ Login failed:", err));
+  .then(() => console.log("🔐 LOGIN SUCCESS"))
+  .catch(err => console.log("❌ LOGIN ERROR:", err));
