@@ -1,14 +1,12 @@
 const { EmbedBuilder, PermissionsBitField } = require("discord.js");
 const db = require("./db");
 
-// format VC time
 function format(sec) {
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   return `${h}h ${m}m`;
 }
 
-// SAFE weekly reset (no timezone bugs)
 function resetIn() {
   const now = new Date();
   const next = new Date();
@@ -17,6 +15,7 @@ function resetIn() {
   next.setUTCDate(next.getUTCDate() + ((7 - next.getUTCDay()) % 7));
 
   const ms = next - now;
+
   const d = Math.floor(ms / 86400000);
   const h = Math.floor((ms % 86400000) / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);
@@ -24,7 +23,6 @@ function resetIn() {
   return `${d}d ${h}h ${m}m`;
 }
 
-// VC LEADERBOARD
 function buildVC(guild) {
   const top = db.prepare(`
     SELECT * FROM vc_time
@@ -47,7 +45,6 @@ function buildVC(guild) {
     .setFooter({ text: "Updates every 10 mins • Resets weekly" });
 }
 
-// CHAT LEADERBOARD
 function buildCHAT(guild) {
   const top = db.prepare(`
     SELECT * FROM chat_time
@@ -70,8 +67,7 @@ function buildCHAT(guild) {
     .setFooter({ text: "Updates every 10 mins • Resets weekly" });
 }
 
-// ADMIN COMMANDS (= prefix)
-async function handleCommands(message) {
+function handleCommands(message) {
   if (!message.guild || message.author.bot) return;
 
   const isAdmin = message.member.permissions.has(
