@@ -1,27 +1,25 @@
-const Database = require("better-sqlite3");
+const { EmbedBuilder, PermissionsBitField } = require("discord.js");
+const db = require("./db");
 
-const db = new Database("vc.sqlite");
+function format(sec) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  return `${h}h ${m}m`;
+}
 
-db.exec(`
-CREATE TABLE IF NOT EXISTS vc_time (
-  guildId TEXT,
-  userId TEXT,
-  time INTEGER DEFAULT 0,
-  PRIMARY KEY (guildId, userId)
-);
+function resetIn() {
+  const now = new Date();
+  const next = new Date();
 
-CREATE TABLE IF NOT EXISTS chat_time (
-  guildId TEXT,
-  userId TEXT,
-  messages INTEGER DEFAULT 0,
-  PRIMARY KEY (guildId, userId)
-);
+  next.setUTCHours(0, 0, 0, 0);
+  next.setUTCDate(next.getUTCDate() + ((7 - next.getUTCDay()) % 7));
 
-CREATE TABLE IF NOT EXISTS settings (
-  guildId TEXT PRIMARY KEY,
-  channelId TEXT,
-  messageId TEXT
-);
-`);
+  const ms = next - now;
+  const d = Math.floor(ms / 86400000);
+  const h = Math.floor((ms % 86400000) / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
 
-module.exports = db;
+  return `${d}d ${h}h ${m}m`;
+}
+
+function
