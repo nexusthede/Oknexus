@@ -1,18 +1,20 @@
 const { Client, GatewayIntentBits } = require("discord.js");
 const mongoose = require("mongoose");
+const express = require("express");
 
 // =========================
-// EXPRESS (24/7 HEALTH CHECK)
+// EXPRESS (HEALTH CHECK)
 // =========================
-const express = require("express");
 const app = express();
 
 app.get("/", (req, res) => {
   res.status(200).send("Bot is alive");
 });
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log("Health check server running");
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Health check server running on port ${PORT}`);
 });
 
 // =========================
@@ -28,49 +30,67 @@ const client = new Client({
 });
 
 // =========================
-// MONGO CONNECT (RENDER ENV)
+// MONGO (STABLE CONNECTION)
 // =========================
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB connected"))
-  .catch(err => console.log("MongoDB error:", err));
+mongoose.connect(process.env.MONGO_URI, {
+  serverSelectionTimeoutMS: 5000
+})
+.then(() => console.log("MongoDB connected"))
+.catch(err => console.log("MongoDB error:", err));
 
 // =========================
-// GUILD WHITELIST (YOUR SERVERS ONLY)
+// GUILD WHITELIST
 // =========================
-const allowedGuilds = [
+const allowedGuilds = new Set([
   "1449708401050259457",
   "1475371068507160586"
-];
+]);
 
 // =========================
-// AUTO LEAVE UNAUTHORIZED SERVERS
+// SAFE GUILD CHECK
 // =========================
 client.on("guildCreate", async (guild) => {
-
-  if (!allowedGuilds.includes(guild.id)) {
-
-    console.log(`Left unauthorized guild: ${guild.name} (${guild.id})`);
-
-    try {
+  try {
+    if (!allowedGuilds.has(guild.id)) {
+      console.log(`Left unauthorized guild: ${guild.name} (${guild.id})`);
       await guild.leave();
-    } catch (err) {
-      console.log("Failed to leave guild:", err);
     }
+  } catch (err) {
+    console.log("Guild leave error:", err);
   }
-
 });
 
 // =========================
-// LOAD SYSTEM FILES
+// SAFE MODULE LOADING
 // =========================
-require("./leaderboard.js")(client);
-require("./vc.js")(client);
+try {
+  require("./leaderboard.js")(client);
+} catch (err) {
+  console.error("Failed to load leaderboard.js:", err);
+}
+
+try {
+  require("./vc.js")(client);
+} catch (err) {
+  console.error("Failed to load vc.js:", err);
+}
 
 // =========================
 // READY EVENT
 // =========================
 client.once("ready", () => {
   console.log(`${client.user.tag} is online`);
+});
+
+// =========================
+// GLOBAL ERROR HANDLING (IMPORTANT)
+// =========================
+process.on("unhandledRejection", (reason) => {
+  console.log("Unhandled Rejection:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.log("Uncaught Exception:", err);
 });
 
 // =========================
