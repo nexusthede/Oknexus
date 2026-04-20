@@ -2,6 +2,20 @@ const { Client, GatewayIntentBits } = require("discord.js");
 const mongoose = require("mongoose");
 
 // =========================
+// EXPRESS (24/7 HEALTH CHECK)
+// =========================
+const express = require("express");
+const app = express();
+
+app.get("/", (req, res) => {
+  res.status(200).send("Bot is alive");
+});
+
+app.listen(process.env.PORT || 3000, () => {
+  console.log("Health check server running");
+});
+
+// =========================
 // CLIENT
 // =========================
 const client = new Client({
