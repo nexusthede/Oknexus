@@ -2,7 +2,7 @@ const { EmbedBuilder } = require("discord.js");
 const mongoose = require("mongoose");
 
 // =========================
-// MONGODB SCHEMAS
+// SCHEMAS
 // =========================
 const userSchema = new mongoose.Schema({
   userId: String,
@@ -17,13 +17,10 @@ const userSchema = new mongoose.Schema({
 
 const guildSchema = new mongoose.Schema({
   guildId: String,
-
   chatLbChannel: String,
   vcLbChannel: String,
-
   chatLbMessage: String,
   vcLbMessage: String,
-
   resetAt: Number
 });
 
@@ -31,12 +28,15 @@ const UserStats = mongoose.model("UserStats", userSchema);
 const GuildConfig = mongoose.model("GuildConfig", guildSchema);
 
 // =========================
-// CACHE (ULTRA LIGHT)
+// CACHE (FIXED LEAK SAFETY)
 // =========================
 const cache = new Map();
 
+// prevent memory leak
+setInterval(() => cache.clear(), 10 * 60 * 1000);
+
 // =========================
-// FAST MEMBER FETCH
+// MEMBER FETCH
 // =========================
 async function getMemberFast(guild, id) {
   if (cache.has(id)) return cache.get(id);
@@ -50,7 +50,7 @@ async function getMemberFast(guild, id) {
 }
 
 // =========================
-// FORMAT VC TIME
+// FORMAT TIME
 // =========================
 function formatTime(ms) {
   const h = Math.floor(ms / 3600000);
@@ -59,11 +59,9 @@ function formatTime(ms) {
 }
 
 // =========================
-// CHAT LEADERBOARD
+// CHAT LB
 // =========================
 async function buildChatLB(guild) {
-  cache.clear();
-
   const top = await UserStats.find({ guildId: guild.id })
     .sort({ weeklyMessages: -1 })
     .limit(10)
@@ -76,7 +74,7 @@ async function buildChatLB(guild) {
     const member = await getMemberFast(guild, u.userId);
 
     lines.push(
-      `**${i + 1}.** ${member ? member.user : "Unknown"} — ${u.weeklyMessages}`
+      `**${i + 1}.** ${member ? member.user : "Unknown"} — ${u.weeklyMessages || 0}`
     );
   }
 
@@ -84,15 +82,13 @@ async function buildChatLB(guild) {
     .setTitle("Weekly Chat Leaderboard")
     .setColor("#141319")
     .setDescription(lines.join("\n") || "No data yet")
-    .setFooter({ text: "Updates every 10 minutes • Resets weekly" });
+    .setFooter({ text: "Resets weekly" });
 }
 
 // =========================
-// VC LEADERBOARD
+// VC LB
 // =========================
 async function buildVCLB(guild) {
-  cache.clear();
-
   const top = await UserStats.find({ guildId: guild.id })
     .sort({ weeklyVoiceTime: -1 })
     .limit(10)
@@ -105,7 +101,7 @@ async function buildVCLB(guild) {
     const member = await getMemberFast(guild, u.userId);
 
     lines.push(
-      `**${i + 1}.** ${member ? member.user : "Unknown"} — ${formatTime(u.weeklyVoiceTime)}`
+      `**${i + 1}.** ${member ? member.user : "Unknown"} — ${formatTime(u.weeklyVoiceTime || 0)}`
     );
   }
 
@@ -113,62 +109,48 @@ async function buildVCLB(guild) {
     .setTitle("Weekly VC Leaderboard")
     .setColor("#141319")
     .setDescription(lines.join("\n") || "No data yet")
-    .setFooter({ text: "Updates every 10 minutes • Resets weekly" });
+    .setFooter({ text: "Resets weekly" });
 }
 
 // =========================
-// RESET SYSTEM (GUILD SAFE + EXACT)
+// RESET SYSTEM (SAFE)
 // =========================
 async function handleWeeklyReset(client) {
   const now = Date.now();
-  const guilds = client.guilds.cache.values();
 
-  for (const guild of guilds) {
+  for (const guild of client.guilds.cache.values()) {
 
-    let config = await GuildConfig.findOne({ guildId: guild.id });
+    const config = await GuildConfig.findOne({ guildId: guild.id });
     if (!config) continue;
 
-    // initialize reset time if missing
     if (!config.resetAt) {
       config.resetAt = now + 7 * 24 * 60 * 60 * 1000;
-
-      await GuildConfig.updateOne(
-        { guildId: guild.id },
-        { resetAt: config.resetAt }
-      );
+      await config.save();
     }
 
-    // RESET ONLY WHEN DUE
-    if (now >= config.resetAt) {
+    if (now < config.resetAt) continue;
 
-      await UserStats.updateMany(
-        { guildId: guild.id },
-        {
-          weeklyMessages: 0,
-          weeklyVoiceTime: 0,
-          vcSessionStart: null,
-          vcChannelId: null
-        }
-      );
+    await UserStats.updateMany(
+      { guildId: guild.id },
+      {
+        weeklyMessages: 0,
+        weeklyVoiceTime: 0,
+        vcSessionStart: null,
+        vcChannelId: null
+      }
+    );
 
-      await GuildConfig.updateOne(
-        { guildId: guild.id },
-        {
-          resetAt: now + 7 * 24 * 60 * 60 * 1000
-        }
-      );
-    }
+    config.resetAt = now + 7 * 24 * 60 * 60 * 1000;
+    await config.save();
   }
 }
 
 // =========================
-// MAIN MODULE
+// MODULE
 // =========================
 module.exports = (client) => {
 
-  // =========================
-  // CHAT TRACKING
-  // =========================
+  // CHAT TRACK
   client.on("messageCreate", async (message) => {
     if (!message.guild || message.author.bot) return;
 
@@ -179,9 +161,7 @@ module.exports = (client) => {
     );
   });
 
-  // =========================
-  // VC TRACKING (ANTI DOUBLE COUNT FIXED)
-  // =========================
+  // VC TRACK (FIXED DOUBLE COUNT + SAFETY)
   client.on("voiceStateUpdate", async (oldState, newState) => {
 
     const userId = newState.id;
@@ -217,7 +197,7 @@ module.exports = (client) => {
       }
     }
 
-    // MOVE VC
+    // MOVE (SAFE FIX)
     if (
       oldState.channelId &&
       newState.channelId &&
@@ -239,23 +219,26 @@ module.exports = (client) => {
     }
   });
 
-  // =========================
-  // AUTO UPDATE (EDIT ONLY)
-  // =========================
+  // AUTO UPDATE (SAFE LOCK)
+  let updating = false;
+
   setInterval(async () => {
+    if (updating) return;
+    updating = true;
 
-    const guilds = client.guilds.cache.values();
+    try {
+      for (const guild of client.guilds.cache.values()) {
 
-    for (const guild of guilds) {
+        const config = await GuildConfig.findOne({ guildId: guild.id });
+        if (!config?.chatLbChannel || !config?.vcLbChannel) continue;
 
-      const config = await GuildConfig.findOne({ guildId: guild.id });
-      if (!config?.chatLbChannel || !config?.vcLbChannel) continue;
-
-      try {
         const chatCh = guild.channels.cache.get(config.chatLbChannel);
         const vcCh = guild.channels.cache.get(config.vcLbChannel);
 
         if (!chatCh || !vcCh) continue;
+
+        const chatEmbed = await buildChatLB(guild);
+        const vcEmbed = await buildVCLB(guild);
 
         let chatMsg = config.chatLbMessage
           ? await chatCh.messages.fetch(config.chatLbMessage).catch(() => null)
@@ -265,95 +248,31 @@ module.exports = (client) => {
           ? await vcCh.messages.fetch(config.vcLbMessage).catch(() => null)
           : null;
 
-        const chatEmbed = await buildChatLB(guild);
-        const vcEmbed = await buildVCLB(guild);
-
-        if (!chatMsg) {
+        if (chatMsg) chatMsg.edit({ embeds: [chatEmbed] });
+        else {
           chatMsg = await chatCh.send({ embeds: [chatEmbed] });
-
-          await GuildConfig.updateOne(
-            { guildId: guild.id },
-            { chatLbMessage: chatMsg.id }
-          );
-        } else {
-          chatMsg.edit({ embeds: [chatEmbed] });
+          config.chatLbMessage = chatMsg.id;
         }
 
-        if (!vcMsg) {
+        if (vcMsg) vcMsg.edit({ embeds: [vcEmbed] });
+        else {
           vcMsg = await vcCh.send({ embeds: [vcEmbed] });
-
-          await GuildConfig.updateOne(
-            { guildId: guild.id },
-            { vcLbMessage: vcMsg.id }
-          );
-        } else {
-          vcMsg.edit({ embeds: [vcEmbed] });
+          config.vcLbMessage = vcMsg.id;
         }
 
-      } catch {}
+        await config.save();
+      }
+
+    } catch (e) {
+      console.error(e);
     }
+
+    updating = false;
 
   }, 10 * 60 * 1000);
 
-  // =========================
-  // RESET LOOP (EXACT SYSTEM)
-  // =========================
+  // RESET LOOP
   setInterval(() => {
     handleWeeklyReset(client).catch(() => {});
   }, 60 * 60 * 1000);
-
-  // =========================
-  // COMMANDS
-  // =========================
-  client.on("messageCreate", async (message) => {
-    if (!message.guild || !message.content.startsWith(",")) return;
-
-    const args = message.content.slice(1).split(/ +/);
-    const cmd = args.shift().toLowerCase();
-
-    if (cmd === "setchatlb") {
-      const ch = message.mentions.channels.first();
-      if (!ch) return;
-      await GuildConfig.updateOne(
-        { guildId: message.guild.id },
-        { chatLbChannel: ch.id },
-        { upsert: true }
-      );
-      return message.reply("Chat leaderboard channel set.");
-    }
-
-    if (cmd === "setvclb") {
-      const ch = message.mentions.channels.first();
-      if (!ch) return;
-      await GuildConfig.updateOne(
-        { guildId: message.guild.id },
-        { vcLbChannel: ch.id },
-        { upsert: true }
-      );
-      return message.reply("VC leaderboard channel set.");
-    }
-
-    if (cmd === "postlb") {
-      const config = await GuildConfig.findOne({ guildId: message.guild.id });
-      if (!config) return;
-
-      const chatCh = message.guild.channels.cache.get(config.chatLbChannel);
-      const vcCh = message.guild.channels.cache.get(config.vcLbChannel);
-
-      if (!chatCh || !vcCh) return message.reply("Leaderboard channels missing.");
-
-      const chatMsg = await chatCh.send({ embeds: [await buildChatLB(message.guild)] });
-      const vcMsg = await vcCh.send({ embeds: [await buildVCLB(message.guild)] });
-
-      await GuildConfig.updateOne(
-        { guildId: message.guild.id },
-        {
-          chatLbMessage: chatMsg.id,
-          vcLbMessage: vcMsg.id
-        }
-      );
-
-      return message.reply("Leaderboards activated.");
-    }
-  });
 };
