@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "description": "Discord VC + Chat Leaderboard Bot",
   "main": "index.js",
+  "type": "commonjs",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
   "engines": {
     "node": "18.x"
@@ -13,5 +15,8 @@
     "discord.js": "^14.16.3",
     "mongoose": "^8.6.0",
     "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
   }
 }
