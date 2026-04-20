@@ -26,8 +26,10 @@ const joinToUnmute = [
 const publicCategory = "1488684928039256165";
 const privateCategory = "1488779858443108353";
 
+// =========================
 // RATE LIMIT
-function isRateLimited(userId, ms = 3000) {
+// =========================
+function isRateLimited(userId, ms = 2500) {
   const now = Date.now();
   const last = rateLimit.get(userId);
   if (last && now - last < ms) return true;
@@ -35,206 +37,274 @@ function isRateLimited(userId, ms = 3000) {
   return false;
 }
 
+// =========================
+// EMBED HELPER
+// =========================
+const embed = (text) =>
+  new EmbedBuilder()
+    .setColor("#141319")
+    .setDescription(text);
+
 module.exports = (client) => {
 
   // =========================
-  // MESSAGE COMMANDS
+  // COMMANDS
   // =========================
   client.on("messageCreate", async (message) => {
-    if (message.author.bot) return;
-    if (!message.content.startsWith(".")) return;
+    if (message.author.bot || !message.content.startsWith(".")) return;
 
     const args = message.content.slice(1).trim().split(/ +/);
     const cmd = args.shift().toLowerCase();
 
-    // SEND PANEL
+    // PANEL
     if (cmd === "send") {
       if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
 
-      const embed = new EmbedBuilder()
+      const panel = new EmbedBuilder()
         .setTitle("VoiceMaster Interface")
-        .setAuthor({
-          name: message.guild.name,
-          iconURL: message.guild.iconURL({ dynamic: true })
-        })
         .setColor("#141319")
-        .setDescription(
-`Use the buttons below to mange your voice channel.
-
-**Buttons**
-<:vc_lock:1477309124537483439> — [\`Lock\`](https://discord.gg/gHnxSMGfR) the voice channel  
-<:vc_unlock:1477309329433559203> — [\`Unlock\`](https://discord.gg/gHnxSMGfR) the voice channel  
-<:vc_hide:1477311897262096497> — [\`Hide\`](https://discord.gg/gHnxSMGfR) the voice channel  
-<:vc_reveal:1477311594638606336> — [\`Reveal\`](https://discord.gg/gHnxSMGfR) the voice channel  
-<:vc_limit:1486267107376234506> — [\`Limit\`](https://discord.gg/gHnxSMGfR) set the user limit  
-<:vc_kick:1477311772137619478> — [\`Kick\`](https://discord.gg/gHnxSMGfR) a user  
-<:vc_ban:1489137904469934141> — [\`Ban\`](https://discord.gg/gHnxSMGfR) a user  
-<:vc_permit:1486267187709607937> — [\`Permit\`](https://discord.gg/gHnxSMGfR) a user  
-<:vc_claim:1489137213378662411> — [\`Claim\`](https://discord.gg/gHnxSMGfR) the voice channel  
-<:vc_info:1477312480463294628> — [\`Info\`](https://discord.gg/gHnxSMGfR) the voice channel`
-        );
+        .setDescription("Use buttons to manage your **voice channel**.");
 
       const row1 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId("vc_lock").setStyle(ButtonStyle.Secondary).setEmoji("1477309124537483439"),
-        new ButtonBuilder().setCustomId("vc_unlock").setStyle(ButtonStyle.Secondary).setEmoji("1477309329433559203"),
-        new ButtonBuilder().setCustomId("vc_hide").setStyle(ButtonStyle.Secondary).setEmoji("1477311897262096497"),
-        new ButtonBuilder().setCustomId("vc_reveal").setStyle(ButtonStyle.Secondary).setEmoji("1477311594638606336"),
-        new ButtonBuilder().setCustomId("vc_limit").setStyle(ButtonStyle.Secondary).setEmoji("1486267107376234506")
+        new ButtonBuilder().setCustomId("vc_lock").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("vc_unlock").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("vc_hide").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("vc_reveal").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("vc_limit").setStyle(ButtonStyle.Secondary)
       );
 
       const row2 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId("vc_kick").setStyle(ButtonStyle.Secondary).setEmoji("1477311772137619478"),
-        new ButtonBuilder().setCustomId("vc_ban").setStyle(ButtonStyle.Secondary).setEmoji("1489137904469934141"),
-        new ButtonBuilder().setCustomId("vc_permit").setStyle(ButtonStyle.Secondary).setEmoji("1486267187709607937"),
-        new ButtonBuilder().setCustomId("vc_claim").setStyle(ButtonStyle.Secondary).setEmoji("1489137213378662411"),
-        new ButtonBuilder().setCustomId("vc_info").setStyle(ButtonStyle.Secondary).setEmoji("1477312480463294628")
+        new ButtonBuilder().setCustomId("vc_transfer").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("vc_claim").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("vc_info").setStyle(ButtonStyle.Secondary)
       );
 
-      return message.channel.send({ embeds: [embed], components: [row1, row2] });
+      return message.channel.send({ embeds: [panel], components: [row1, row2] });
     }
 
     // VC COMMANDS
     if (cmd === "vc") {
 
       if (isRateLimited(message.member.id)) {
-        return message.reply({ embeds: [new EmbedBuilder().setDescription("Slow down.")] });
+        return message.reply({ embeds: [embed("Slow down.")] });
       }
 
       const sub = args[0];
       const vc = message.member.voice.channel;
+      if (!vc) return message.reply({ embeds: [embed("You’re not in a **voice channel**.")] });
 
-      if (!vc) return message.reply({ embeds: [new EmbedBuilder().setDescription("You’re not in a **voice channel**.")] });
+      let ownerId = owners.get(vc.id);
 
-      const ownerId = owners.get(vc.id) || null;
+      // auto recovery
+      if (!ownerId && vc.members.size > 0) {
+        owners.set(vc.id, vc.members.first().id);
+        ownerId = owners.get(vc.id);
+      }
 
-      try {
-        switch (sub) {
+      const isOwner = () => ownerId && ownerId === message.member.id;
 
-          case "lock":
-            if (ownerId !== message.member.id) return message.reply({ embeds: [new EmbedBuilder().setDescription("Only the owner can use vc commands.")] });
-            await vc.setParent(privateCategory).catch(() => {});
-            await vc.permissionOverwrites.edit(message.guild.roles.everyone, { Connect: false });
-            for (const member of vc.members.values()) await vc.permissionOverwrites.edit(member, { Connect: true });
-            message.reply({ embeds: [new EmbedBuilder().setDescription("Your **voice channel** has been locked.")] });
-            break;
+      switch (sub) {
 
-          case "unlock":
-            if (ownerId !== message.member.id) return message.reply({ embeds: [new EmbedBuilder().setDescription("Only the owner can use vc commands.")] });
-            await vc.setParent(publicCategory).catch(() => {});
-            await vc.permissionOverwrites.edit(message.guild.roles.everyone, { Connect: true });
-            message.reply({ embeds: [new EmbedBuilder().setDescription("Your **voice channel** has been unlocked.")] });
-            break;
+        case "lock":
+          if (!isOwner()) return message.reply({ embeds: [embed("Only owner.")] });
+          await vc.setParent(privateCategory).catch(() => {});
+          await vc.permissionOverwrites.edit(message.guild.roles.everyone, { Connect: false });
+          return message.reply({ embeds: [embed("Locked.")] });
 
-          case "hide":
-            if (ownerId !== message.member.id) return message.reply({ embeds: [new EmbedBuilder().setDescription("Only the owner can use vc commands.")] });
-            await vc.setParent(privateCategory).catch(() => {});
-            await vc.permissionOverwrites.edit(message.guild.roles.everyone, { ViewChannel: false, Connect: false });
-            for (const member of vc.members.values()) await vc.permissionOverwrites.edit(member, { ViewChannel: true, Connect: true });
-            message.reply({ embeds: [new EmbedBuilder().setDescription("Your **voice channel** has been hidden.")] });
-            break;
+        case "unlock":
+          if (!isOwner()) return message.reply({ embeds: [embed("Only owner.")] });
+          await vc.setParent(publicCategory).catch(() => {});
+          await vc.permissionOverwrites.edit(message.guild.roles.everyone, { Connect: true });
+          return message.reply({ embeds: [embed("Unlocked.")] });
 
-          case "reveal":
-            if (ownerId !== message.member.id) return message.reply({ embeds: [new EmbedBuilder().setDescription("Only the owner can use vc commands.")] });
-            await vc.setParent(publicCategory).catch(() => {});
-            await vc.permissionOverwrites.edit(message.guild.roles.everyone, { ViewChannel: true, Connect: true });
-            message.reply({ embeds: [new EmbedBuilder().setDescription("Your **voice channel** is now visible.")] });
-            break;
+        case "hide":
+          if (!isOwner()) return message.reply({ embeds: [embed("Only owner.")] });
+          await vc.permissionOverwrites.edit(message.guild.roles.everyone, {
+            ViewChannel: false,
+            Connect: false
+          });
+          return message.reply({ embeds: [embed("Hidden.")] });
 
-          case "limit":
-            if (ownerId !== message.member.id) return message.reply({ embeds: [new EmbedBuilder().setDescription("Only the owner can use vc commands.")] });
-            const limit = Number(args[1]);
-            if (!Number.isInteger(limit) || limit < 0 || limit > 99) return message.reply("Provide valid number.");
-            await vc.edit({ userLimit: limit });
-            message.reply({ embeds: [new EmbedBuilder().setDescription(`User limit set to **${limit}**.`)] });
-            break;
+        case "reveal":
+          if (!isOwner()) return message.reply({ embeds: [embed("Only owner.")] });
+          await vc.permissionOverwrites.edit(message.guild.roles.everyone, {
+            ViewChannel: true,
+            Connect: true
+          });
+          return message.reply({ embeds: [embed("Revealed.")] });
 
-          case "kick":
-            if (ownerId !== message.member.id) return message.reply({ embeds: [new EmbedBuilder().setDescription("Only the owner can use vc commands.")] });
-            const kickMember = message.mentions.members.first();
-            if (!kickMember || kickMember.voice.channel?.id !== vc.id) return message.reply("Cannot kick this user.");
-            await kickMember.voice.disconnect().catch(() => {});
-            message.reply({ embeds: [new EmbedBuilder().setDescription(`**${kickMember.user.username}** has been kicked.`)] });
-            break;
+        case "limit":
+          if (!isOwner()) return message.reply({ embeds: [embed("Only owner.")] });
 
-          case "ban":
-            if (ownerId !== message.member.id) return message.reply({ embeds: [new EmbedBuilder().setDescription("Only the owner can use vc commands.")] });
-            const banMember = message.mentions.members.first();
-            if (!banMember) return message.reply("Mention a user.");
-            await vc.permissionOverwrites.edit(banMember, { Connect: false }).catch(() => {});
-            message.reply({ embeds: [new EmbedBuilder().setDescription(`**${banMember.user.username}** has been banned.`)] });
-            break;
+          const limit = Number(args[1]);
+          if (!Number.isInteger(limit) || limit < 0 || limit > 99)
+            return message.reply({ embeds: [embed("0–99 only.")] });
 
-          case "permit":
-            if (ownerId !== message.member.id) return message.reply({ embeds: [new EmbedBuilder().setDescription("Only the owner can use vc commands.")] });
-            const permitMember = message.mentions.members.first();
-            if (!permitMember) return message.reply("Mention a user.");
-            await vc.permissionOverwrites.edit(permitMember, { ViewChannel: true, Connect: true }).catch(() => {});
-            message.reply({ embeds: [new EmbedBuilder().setDescription(`**${permitMember.user.username}** can join.`)] });
-            break;
+          await vc.setUserLimit(limit);
+          return message.reply({ embeds: [embed(`Limit set to **${limit}**.`)] });
 
-          case "transfer":
-            if (ownerId !== message.member.id) return message.reply({ embeds: [new EmbedBuilder().setDescription("Only owner can transfer.")] });
-            const newOwner = message.mentions.members.first();
-            if (!newOwner || newOwner.voice.channel?.id !== vc.id) return message.reply("User must be in VC.");
-            owners.set(vc.id, newOwner.id);
-            message.reply({ embeds: [new EmbedBuilder().setDescription(`Ownership transferred to **${newOwner.user.username}**.`)] });
-            break;
+        case "kick":
+          if (!isOwner()) return message.reply({ embeds: [embed("Only owner.")] });
 
-          case "claim":
-            if (ownerId && vc.guild.members.cache.get(ownerId)?.voice?.channelId === vc.id) {
-              return message.reply({ embeds: [new EmbedBuilder().setDescription("Owner still in VC.")] });
-            }
-            owners.set(vc.id, message.member.id);
-            message.reply({ embeds: [new EmbedBuilder().setDescription("You claimed ownership.")] });
-            break;
+          const kick = message.mentions.members.first();
+          if (!kick || kick.voice.channelId !== vc.id)
+            return message.reply({ embeds: [embed("Invalid user.")] });
 
-          case "info":
-            const membersList = vc.members.map(m => `• ${m.displayName}`).join("\n") || "No members";
-            const ownerMember = vc.guild.members.cache.get(ownerId);
+          await kick.voice.disconnect().catch(() => {});
+          return message.reply({ embeds: [embed(`${kick.user.username} kicked.`)] });
 
-            const embedInfo = new EmbedBuilder()
-              .setTitle(`VC Info - ${vc.name}`)
-              .setColor("#141319")
-              .addFields(
-                { name: "Owner", value: ownerMember ? ownerMember.user.tag : "None", inline: true },
-                { name: "Members", value: `${vc.members.size}`, inline: true },
-                { name: "Limit", value: vc.userLimit > 0 ? `${vc.userLimit}` : "None", inline: true }
-              );
+        case "ban":
+          if (!isOwner()) return message.reply({ embeds: [embed("Only owner.")] });
 
-            message.channel.send({ embeds: [embedInfo] });
-            break;
+          const ban = message.mentions.members.first();
+          if (!ban) return message.reply({ embeds: [embed("Mention user.")] });
 
-          case "rename":
-            if (ownerId !== message.member.id) return message.reply({ embeds: [new EmbedBuilder().setDescription("Only owner.")] });
-            const newName = args.slice(1).join(" ");
-            if (!newName) return message.reply("Provide name.");
-            await vc.setName(newName);
-            message.reply(`Renamed to ${newName}`);
-            break;
+          await vc.permissionOverwrites.edit(ban, { Connect: false });
+          return message.reply({ embeds: [embed(`${ban.user.username} banned.`)] });
 
-          default:
-            message.reply("Unknown command.");
-        }
-      } catch (err) {
-        console.error(err);
+        case "permit":
+          if (!isOwner()) return message.reply({ embeds: [embed("Only owner.")] });
+
+          const permit = message.mentions.members.first();
+          if (!permit) return message.reply({ embeds: [embed("Mention user.")] });
+
+          await vc.permissionOverwrites.edit(permit, { Connect: true });
+          return message.reply({ embeds: [embed(`${permit.user.username} permitted.`)] });
+
+        case "move":
+          if (!isOwner()) return message.reply({ embeds: [embed("Only owner.")] });
+
+          const move = message.mentions.members.first();
+          if (!move || !move.voice.channel)
+            return message.reply({ embeds: [embed("Invalid user.")] });
+
+          await move.voice.setChannel(vc);
+          return message.reply({ embeds: [embed(`${move.user.username} moved.`)] });
+
+        case "reject":
+          if (!isOwner()) return message.reply({ embeds: [embed("Only owner.")] });
+
+          const reject = message.mentions.members.first();
+          if (!reject) return message.reply({ embeds: [embed("Mention user.")] });
+
+          await vc.permissionOverwrites.edit(reject, { Connect: false });
+          return message.reply({ embeds: [embed(`${reject.user.username} rejected.`)] });
+
+        case "transfer":
+          if (!isOwner()) return message.reply({ embeds: [embed("Only owner.")] });
+
+          const newOwner = message.mentions.members.first();
+          if (!newOwner || newOwner.voice.channelId !== vc.id)
+            return message.reply({ embeds: [embed("Must be in VC.")] });
+
+          owners.set(vc.id, newOwner.id);
+          return message.reply({ embeds: [embed(`Ownership → **${newOwner.user.username}**`)] });
+
+        case "claim":
+          if (ownerId && vc.members.has(ownerId))
+            return message.reply({ embeds: [embed("Owner still here.")] });
+
+          owners.set(vc.id, message.member.id);
+          return message.reply({ embeds: [embed("You claimed ownership.")] });
+
+        case "rename":
+          if (!isOwner()) return message.reply({ embeds: [embed("Only owner.")] });
+
+          const name = args.slice(1).join(" ");
+          if (!name) return message.reply({ embeds: [embed("Provide name.")] });
+
+          await vc.setName(name);
+          return message.reply({ embeds: [embed(`Renamed → **${name}**`)] });
+
+        default:
+          return message.reply({ embeds: [embed("Unknown command.")] });
       }
     }
   });
 
   // =========================
-  // VOICE STATE UPDATE
+  // BUTTONS
+  // =========================
+  client.on("interactionCreate", async (interaction) => {
+    if (!interaction.isButton()) return;
+
+    const vc = interaction.member.voice.channel;
+    if (!vc) return interaction.reply({ embeds: [embed("Not in VC.")], ephemeral: true });
+
+    let ownerId = owners.get(vc.id);
+
+    if (!ownerId && vc.members.size > 0) {
+      owners.set(vc.id, vc.members.first().id);
+      ownerId = owners.get(vc.id);
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    const isOwner = () => ownerId && ownerId === interaction.member.id;
+
+    switch (interaction.customId) {
+
+      case "vc_lock":
+        if (!isOwner()) return interaction.editReply({ embeds: [embed("Only owner.")] });
+        await vc.setParent(privateCategory).catch(() => {});
+        await vc.permissionOverwrites.edit(interaction.guild.roles.everyone, { Connect: false });
+        return interaction.editReply({ embeds: [embed("Locked.")] });
+
+      case "vc_unlock":
+        if (!isOwner()) return interaction.editReply({ embeds: [embed("Only owner.")] });
+        await vc.setParent(publicCategory).catch(() => {});
+        await vc.permissionOverwrites.edit(interaction.guild.roles.everyone, { Connect: true });
+        return interaction.editReply({ embeds: [embed("Unlocked.")] });
+
+      case "vc_hide":
+        if (!isOwner()) return interaction.editReply({ embeds: [embed("Only owner.")] });
+        await vc.permissionOverwrites.edit(interaction.guild.roles.everyone, {
+          ViewChannel: false,
+          Connect: false
+        });
+        return interaction.editReply({ embeds: [embed("Hidden.")] });
+
+      case "vc_reveal":
+        if (!isOwner()) return interaction.editReply({ embeds: [embed("Only owner.")] });
+        await vc.permissionOverwrites.edit(interaction.guild.roles.everyone, {
+          ViewChannel: true,
+          Connect: true
+        });
+        return interaction.editReply({ embeds: [embed("Revealed.")] });
+
+      case "vc_claim":
+        if (ownerId && vc.members.has(ownerId))
+          return interaction.editReply({ embeds: [embed("Owner still here.")] });
+
+        owners.set(vc.id, interaction.member.id);
+        return interaction.editReply({ embeds: [embed("Claimed.")] });
+
+      case "vc_limit":
+        return interaction.editReply({ embeds: [embed("Use .vc limit")] });
+
+      case "vc_transfer":
+        return interaction.editReply({ embeds: [embed("Use .vc transfer")] });
+
+      case "vc_info":
+        return interaction.editReply({ embeds: [embed("Use .vc info")] });
+
+      default:
+        return interaction.editReply({ embeds: [embed("Unknown button.")] });
+    }
+  });
+
+  // =========================
+  // VC SYSTEM
   // =========================
   client.on("voiceStateUpdate", async (oldState, newState) => {
 
-    // CREATE
     if (joinToCreate.includes(newState.channelId)) {
 
       if (activeCreateCooldown.has(newState.member.id)) return;
-
       activeCreateCooldown.set(newState.member.id, true);
 
       const vc = await newState.guild.channels.create({
-        name: `${newState.member.displayName}'s channel`,
+        name: `${newState.member.displayName}'s VC`,
         type: ChannelType.GuildVoice,
         parent: publicCategory
       }).catch(() => null);
@@ -244,44 +314,36 @@ module.exports = (client) => {
       owners.set(vc.id, newState.member.id);
       await newState.member.voice.setChannel(vc).catch(() => {});
 
-      setTimeout(() => {
-        activeCreateCooldown.delete(newState.member.id);
-      }, 5000);
-
-      return;
+      setTimeout(() => activeCreateCooldown.delete(newState.member.id), 5000);
     }
 
-    // UNMUTE
     if (
       joinToUnmute.includes(newState.channelId) &&
       oldState.channel &&
       oldState.channelId !== newState.channelId
     ) {
-
       if (tempVCs.get(newState.member.id)) return;
-
       tempVCs.set(newState.member.id, true);
 
       try {
         await newState.member.voice.setMute(false);
-        await new Promise(res => setTimeout(res, 500));
+        await new Promise(r => setTimeout(r, 500));
         await newState.member.voice.setChannel(oldState.channel);
-      } catch (err) {}
+      } catch {}
 
       setTimeout(() => tempVCs.delete(newState.member.id), 5000);
     }
 
-    // DELETE
     if (oldState.channel) {
-      const channel = oldState.channel;
+      const ch = oldState.channel;
 
-      if (!channel || channel.type !== ChannelType.GuildVoice) return;
-      if (![publicCategory, privateCategory].includes(channel.parentId)) return;
-      if (joinToCreate.includes(channel.id) || joinToUnmute.includes(channel.id)) return;
+      if (!ch || ch.type !== ChannelType.GuildVoice) return;
+      if (![publicCategory, privateCategory].includes(ch.parentId)) return;
+      if (joinToCreate.includes(ch.id) || joinToUnmute.includes(ch.id)) return;
 
-      if (channel.members.size === 0) {
-        owners.delete(channel.id);
-        channel.delete().catch(() => {});
+      if (ch.members.size === 0) {
+        owners.delete(ch.id);
+        ch.delete().catch(() => {});
       }
     }
   });
